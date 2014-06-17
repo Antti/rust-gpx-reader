@@ -1,7 +1,6 @@
 extern crate core;
 use std::vec::Vec;
 use std::io::{Reader, MemReader};
-// use std::io::fs::File;
 
 pub mod bitbuffer {
   pub struct BitBuffer {
@@ -15,7 +14,8 @@ pub mod bitbuffer {
       BitBuffer{buffer: data, bit_position: 8, byte: 0}
     }
 
-    // Reads MSB first
+    // Reads bit one by one
+	  #[inline]
     pub fn read_bit(&mut self) -> Option<u8> {
       if self.bit_position == 8 {
         let byte = self.buffer.read_byte();
@@ -25,8 +25,6 @@ pub mod bitbuffer {
         }
         self.bit_position = 0;
       }
-
-      // let bit = (self.byte & (1<<(self.bit_position)) ) >> (self.bit_position); // littleEndian LSB
       let bit = (self.byte >> (8 - self.bit_position - 1)) & 0x1; //MSB
       self.bit_position += 1;
       Some(bit)
@@ -34,7 +32,6 @@ pub mod bitbuffer {
 
     // bigEndian MSB
     pub fn read_bits(&mut self, count: uint) -> Option<uint> {
-      // println!("Reading bits, count: {}", count);
       let mut word = 0u;
       for idx in range(0, count) {
         match self.read_bit() {
@@ -45,9 +42,7 @@ pub mod bitbuffer {
       Some(word)
     }
 
-    //littleEndian LSB
     pub fn read_bits_reversed(&mut self, count: uint) -> Option<uint> {
-      // println!("Reading bits reversed, count: {}", count);
       let mut word = 0u;
       for idx in range(0, count) {
         match self.read_bit() {
@@ -57,6 +52,7 @@ pub mod bitbuffer {
       }
       Some(word)
     }
+
 
     pub fn read_byte(&mut self) -> Option<u8> {
       self.read_bits(8).map(|opt| opt as u8 )
@@ -105,7 +101,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
     let source_position = decomressed_data.len() - offset;
     let to_read = core::cmp::min(len, offset);
     let slice = decomressed_data.slice(source_position, source_position+to_read).to_owned();
-    decomressed_data.push_all(slice);
+    decomressed_data.push_all(slice.as_slice());
     true
   }
 
@@ -120,7 +116,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
     }
   }
   println!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), decomressed_data_len);
-  return decomressed_data
+  decomressed_data
 }
 
 
@@ -128,6 +124,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
 mod tests {
   use std::io::MemReader;
   use bitbuffer::BitBuffer;
+  #[allow(unreachable_code)]
   #[test]
   pub fn test_load_bcfz(){
     return;
@@ -177,12 +174,17 @@ mod tests {
 }
 
 #[allow(unused_must_use)]
+#[cfg(not(test))]
 fn main(){
-  // let file_name = "/Users/andrii/Downloads/pink_floyd_hey_you.gpx";
-  // let data = Vec::from_slice( File::open(&Path::new(file_name)).read_to_end().unwrap().tailn(4) );
-  let mut stdout = std::io::stdio::stdout();
-  let mut stdin = std::io::stdio::stdin();
-  let data = Vec::from_slice(stdin.read_to_end().unwrap().tailn(4));
+  use std::io::fs::File;
+  let stream = if std::os::args().len() > 1{
+    File::open(&Path::new(std::os::args().get(1).as_slice())).read_to_end()
+  }else{
+    let mut stdin = std::io::stdio::stdin();
+    stdin.read_to_end()
+  };
+  let data = Vec::from_slice(stream.unwrap().tailn(4));
   let content = decompress_bcfz(data);
+  let mut stdout = std::io::stdio::stdout();
   stdout.write(content.as_slice());
 }

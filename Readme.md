@@ -1,6 +1,6 @@
 Rust gpx reader
 ===============
-****
+
 ###Reads GuitarPro 6 compressed gpx file with BCFZ compression.
 ****
 
