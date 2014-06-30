@@ -25,7 +25,7 @@ pub mod bitbuffer {
         }
         self.bit_position = 0;
       }
-      let bit = (self.byte >> (8 - self.bit_position - 1)) & 0x1; //MSB
+      let bit = (self.byte >> (8 - self.bit_position - 1) as uint) & 0x1; //MSB
       self.bit_position += 1;
       Some(bit)
     }
