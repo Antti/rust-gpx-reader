@@ -1,0 +1,9 @@
+[package]
+
+name = "gpx_reader"
+version = "0.0.1"
+authors = [ "Andrii Dmytrenko <refresh.xss@gmail.com>" ]
+
+[[bin]]
+
+name = "gpx_reader"
