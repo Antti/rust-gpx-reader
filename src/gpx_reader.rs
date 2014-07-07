@@ -1,4 +1,3 @@
-extern crate core;
 use std::vec::Vec;
 use std::io::{Reader, MemReader};
 
@@ -99,7 +98,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
       None => return false
     };
     let source_position = decomressed_data.len() - offset;
-    let to_read = core::cmp::min(len, offset);
+    let to_read = std::cmp::min(len, offset);
     let slice = decomressed_data.slice(source_position, source_position+to_read).to_owned();
     decomressed_data.push_all(slice.as_slice());
     true
