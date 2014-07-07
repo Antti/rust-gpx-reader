@@ -114,7 +114,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
       None => return decomressed_data
     }
   }
-  println!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), decomressed_data_len);
+  std::io::stdio::stderr().write_line(format!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), decomressed_data_len).as_slice()).unwrap();
   decomressed_data
 }
 
