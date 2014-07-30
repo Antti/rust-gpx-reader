@@ -9,7 +9,6 @@ pub enum GpxFileType {
 }
 
 #[deriving(Show)]
-#[deriving(Decodable, Encodable)]
 pub struct File {
   file_name: String,
   file_data: Vec<u8>
@@ -19,8 +18,12 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
   match check_file_type(data.as_slice()){
     BCFZ => {
       let data = Vec::from_slice(data.tailn(4));
-      let content = Vec::from_slice(decompress_bcfz(data).tailn(4));
-      Ok(decompress_bcfs(content))
+      let decompressed = decompress_bcfz(data);
+      match check_file_type(decompressed.as_slice()) {
+        BCFS => Ok(decompress_bcfs(decompressed.tailn(4).to_vec())),
+        BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
+        Unknown => Err("BCFZ file didn't contain BCFS inside".to_string())
+      }
     },
     BCFS => {
       let data = Vec::from_slice(data.tailn(4));

@@ -1,4 +1,4 @@
-pub mod gpx;
+mod gpx;
 mod bitbuffer;
 
 fn main(){
