@@ -89,33 +89,33 @@ pub fn decompress_bcfs(data: Vec<u8>) -> Vec<File> {
     if offset + 3 >= data_len {
       break;
     }
-    reader.seek(offset, std::io::SeekSet);
+    reader.seek(offset, std::io::SeekSet).unwrap();
     if reader.read_le_i32().unwrap() == 2 {
       let index_file_name = offset + 4;
       let index_file_size = offset + 0x8C;
       let index_of_block = offset + 0x94;
       let mut file_data : Vec<u8> = Vec::new();
 
-      let mut block = 0i32;
+      let mut block;
       let mut block_count = 0i64;
       loop {
-        reader.seek(index_of_block + (4*block_count), std::io::SeekSet);
+        reader.seek(index_of_block + (4*block_count), std::io::SeekSet).unwrap();
         block = reader.read_le_i32().unwrap();
         if block == 0 {
           break;
         }
         offset = (block as i64) * sector_size;
-        reader.seek(offset, std::io::SeekSet);
+        reader.seek(offset, std::io::SeekSet).unwrap();
         file_data = file_data.append(reader.read_exact(sector_size as uint).unwrap().as_slice());
         block_count += 1;
       }
 
-      reader.seek(index_file_size, std::io::SeekSet);
+      reader.seek(index_file_size, std::io::SeekSet).unwrap();
       let file_size = reader.read_le_i32().unwrap() as uint;
-      if (file_size <= file_data.len()){
-        reader.seek(index_file_name, std::io::SeekSet);
-        let file_name = String::from_utf8(reader.read_exact(127).unwrap()).unwrap();
-        reader.seek(index_file_name, std::io::SeekSet);
+      if file_size <= file_data.len() {
+        reader.seek(index_file_name, std::io::SeekSet).unwrap();
+        let file_name = std::str::from_utf8(reader.read_exact(127).unwrap().as_slice()).unwrap().trim_right_chars('\0').to_string();
+        reader.seek(index_file_name, std::io::SeekSet).unwrap();
         let file_bytes = file_data.slice(0, file_size);
         files.push(File{file_name: file_name.clone(), file_data: file_bytes.to_vec()});
       }
