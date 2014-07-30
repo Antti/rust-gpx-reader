@@ -1,5 +1,5 @@
 extern crate std;
-use std::io::{Reader, MemReader};
+use std::io::{IoResult,MemReader};
 use bitbuffer;
 
 pub enum GpxFileType {
@@ -44,52 +44,39 @@ pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
   let mut decomressed_data : Vec<u8> = Vec::with_capacity(decomressed_data_len);
   // println!("Expected decomressed_data len: {}", decomressed_data_len);
 
-  fn read_uncompressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> bool {
-    let len = match bb.read_bits_reversed(2){
-      Some(x) => x,
-      None => return false
-    };
+  #[inline]
+  fn read_uncompressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
+    let len = try!(bb.read_bits_reversed(2));
     for _ in range(0,len) {
-      let byte = match bb.read_byte(){
-        Some(x) => x,
-        None => return false
-      };
+      let byte = try!(bb.read_byte());
       decomressed_data.push(byte);
-    }
-    true
+    };
+    Ok(())
   }
 
-  fn read_compressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> bool {
-    let word_size = match bb.read_bits(4){
-      Some(x) => x,
-      None => return false
-    };
-    let offset = match bb.read_bits_reversed(word_size){
-      Some(x) => x,
-      None => return false
-    };
-    let len = match bb.read_bits_reversed(word_size){
-      Some(x) => x,
-      None => return false
-    };
+  #[inline]
+  fn read_compressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
+    let word_size = try!(bb.read_bits(4));
+    let offset = try!(bb.read_bits_reversed(word_size));
+    let len = try!(bb.read_bits_reversed(word_size));
     let source_position = decomressed_data.len() - offset;
     let to_read = std::cmp::min(len, offset);
     let slice = decomressed_data.slice(source_position, source_position+to_read).to_vec();
     decomressed_data.push_all(slice.as_slice());
-    true
+    Ok(())
   }
 
   while decomressed_data.len() < decomressed_data_len {
     match bb.read_bit() {
-      Some(x) => match x {
-        0 => { read_uncompressed_chunk(&mut bb, &mut decomressed_data) || return decomressed_data; },
-        1 => { read_compressed_chunk(&mut bb, &mut decomressed_data) || return decomressed_data; },
+      Ok(x) => match x {
+        0 => { read_uncompressed_chunk(&mut bb, &mut decomressed_data).is_ok() || return decomressed_data; },
+        1 => { read_compressed_chunk(&mut bb, &mut decomressed_data).is_ok() || return decomressed_data; },
         _ => unreachable!()
       },
-      None => return decomressed_data
+      Err(_) => return decomressed_data
     }
   }
-  std::io::stdio::stderr().write_line(format!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), decomressed_data_len).as_slice()).unwrap();
+  // std::io::stdio::stderr().write_line(format!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), decomressed_data_len).as_slice()).unwrap();
   decomressed_data
 }
 
@@ -144,6 +131,7 @@ pub fn decompress_bcfs(data: Vec<u8>) -> Vec<File> {
 mod tests {
   use std::io::MemReader;
   use bitbuffer::BitBuffer;
+
   #[allow(unreachable_code)]
   #[test]
   pub fn test_load_bcfz(){
