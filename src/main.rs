@@ -11,18 +11,6 @@ fn main(){
     stdin.read_to_end()
   };
   let file_data = stream.unwrap();
-  match gpx::check_file_type(file_data.as_slice()) {
-    gpx::BCFZ => {
-      let data = Vec::from_slice(file_data.tailn(4));
-      let content = gpx::decompress_bcfz(data);
-      let mut stdout = std::io::stdio::stdout();
-      stdout.write(content.as_slice()).unwrap();
-    },
-    gpx::BCFS => {
-      let data = Vec::from_slice(file_data.tailn(4));
-      let files = gpx::decompress_bcfs(data);
-      println!("{}", files);
-    },
-    gpx::Unknown => fail!("Unknown file type (wrong file header)")
-  };
+  let files = gpx::read(file_data).unwrap();
+  println!("{}", files);
 }
