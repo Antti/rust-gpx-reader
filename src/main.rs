@@ -1,3 +1,5 @@
+extern crate serialize;
+
 mod gpx;
 mod bitbuffer;
 
