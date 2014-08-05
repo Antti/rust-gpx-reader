@@ -6,6 +6,15 @@ pub struct BitBuffer {
   byte: u8
 }
 
+impl Reader for BitBuffer {
+  fn read(&mut self, buf: &mut [u8]) -> IoResult<uint> {
+    for pos in range(0, buf.len()){
+      buf[pos] = try!(self.read_bits(8).map(|opt| opt as u8 ));
+    }
+    return Ok(buf.len())
+  }
+}
+
 impl BitBuffer {
   pub fn new(data: Box<Reader>) -> BitBuffer {
     BitBuffer{buffer: data, bit_position: 8, byte: 0}
@@ -40,15 +49,6 @@ impl BitBuffer {
       word = word | (bit as uint << idx);
     }
     Ok(word)
-  }
-
-
-  pub fn read_byte(&mut self) -> IoResult<u8> {
-    self.read_bits(8).map(|opt| opt as u8 )
-  }
-
-  pub fn read_le_i32(&mut self) -> IoResult<uint> {
-    self.buffer.read_le_i32().map(|x| x as uint)
   }
 }
 

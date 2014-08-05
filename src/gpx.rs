@@ -47,7 +47,7 @@ pub fn check_file_type(data: &[u8]) -> GpxFileType {
 
 pub fn decompress_bcfz(data: Vec<u8>) -> Vec<u8> {
   let mut bb = bitbuffer::BitBuffer::new(box MemReader::new(data));
-  let expected_decomressed_data_len = bb.read_le_i32().unwrap();
+  let expected_decomressed_data_len = bb.read_le_i32().unwrap() as uint;
   let mut decomressed_data : Vec<u8> = Vec::with_capacity(expected_decomressed_data_len);
   // println!("Expected decomressed_data len: {}", decomressed_data_len);
 
