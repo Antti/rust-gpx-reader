@@ -20,21 +20,21 @@ pub struct File {
 pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
   match check_file_type(data.as_slice()){
     BCFZ => {
-      let data = Vec::from_slice(data.tailn(4));
+      let data = Vec::from_slice(data.slice_from(4));
       let bcfs_data = match decompress_bcfz(data) {
         Err(err) => return Err(err.desc.to_string()),
         Ok(data) => data
       };
       match check_file_type(bcfs_data.as_slice()) {
         BCFS => {
-          decompress_bcfs(bcfs_data.tailn(4).to_vec()).map_err(|e| e.desc.to_string())
+          decompress_bcfs(bcfs_data.slice_from(4).to_vec()).map_err(|e| e.desc.to_string())
         },
         BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
         Unknown => Err("BCFZ file didn't contain BCFS inside".to_string())
       }
     },
     BCFS => {
-      let data = Vec::from_slice(data.tailn(4));
+      let data = Vec::from_slice(data.slice_from(4));
       decompress_bcfs(data).map_err(|e| e.desc.to_string())
     },
     Unknown => Err("Unknown file type".to_string())
@@ -147,7 +147,7 @@ mod tests {
     return;
     //NOT IMPLEMENTED. Need good source data example.
     let data = vec!();
-    assert_eq!(::gpx::decompress_bcfz(data), vec!());
+    assert_eq!(::gpx::decompress_bcfz(data).unwrap(), vec!());
   }
 
   #[test]
