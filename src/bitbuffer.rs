@@ -1,7 +1,7 @@
 use std::io::{Reader, IoResult};
 
 pub struct BitBuffer {
-  buffer: Box<Reader>,
+  buffer: Box<Reader+'static>,
   bit_position: u8,
   byte: u8
 }
@@ -16,7 +16,7 @@ impl Reader for BitBuffer {
 }
 
 impl BitBuffer {
-  pub fn new(data: Box<Reader>) -> BitBuffer {
+  pub fn new(data: Box<Reader+'static>) -> BitBuffer {
     BitBuffer{buffer: data, bit_position: 8, byte: 0}
   }
 
