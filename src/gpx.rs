@@ -1,6 +1,6 @@
 extern crate serialize;
 
-use std::io::{IoResult,MemReader, stdio, SeekSet};
+use std::io::{IoResult,MemReader, SeekSet};
 use std::cmp;
 use std::str;
 use bitbuffer;
@@ -85,7 +85,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
       _ => unreachable!()
     }
   }
-  stdio::stderr().write_line(format!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), expected_decomressed_data_len).as_slice()).unwrap();
+  // stdio::stderr().write_line(format!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), expected_decomressed_data_len).as_slice()).unwrap();
   Ok(decomressed_data)
 }
 
