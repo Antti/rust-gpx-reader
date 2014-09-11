@@ -1,10 +1,14 @@
+#![feature(phase)]
+#[phase(plugin, link)] extern crate log;
 extern crate serialize;
 
-use std::io::{IoResult,MemReader, SeekSet};
+use std::io::{IoResult, MemReader, SeekSet};
 use std::cmp;
 use std::str;
-use bitbuffer;
 
+pub mod bitbuffer;
+
+#[deriving(Show)]
 pub enum GpxFileType {
   BCFS,
   BCFZ,
@@ -18,8 +22,10 @@ pub struct File {
 }
 
 pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
+  debug!("Reading file...");
   match check_file_type(data.as_slice()){
     BCFZ => {
+      debug!("File type BCFZ");
       let data = Vec::from_slice(data.slice_from(4));
       let bcfs_data = match decompress_bcfz(data) {
         Err(err) => return Err(err.desc.to_string()),
@@ -27,6 +33,7 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
       };
       match check_file_type(bcfs_data.as_slice()) {
         BCFS => {
+          debug!("Decompressed BCFZ, found BCFS inside");
           decompress_bcfs(bcfs_data.slice_from(4).to_vec()).map_err(|e| e.desc.to_string())
         },
         BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
@@ -34,6 +41,7 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
       }
     },
     BCFS => {
+      debug!("File type BCFS");
       let data = Vec::from_slice(data.slice_from(4));
       decompress_bcfs(data).map_err(|e| e.desc.to_string())
     },
@@ -53,7 +61,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
   let mut bb = bitbuffer::BitBuffer::new(box MemReader::new(data));
   let expected_decomressed_data_len = try!(bb.read_le_i32()) as uint;
   let mut decomressed_data : Vec<u8> = Vec::with_capacity(expected_decomressed_data_len);
-  // println!("Expected decomressed_data len: {}", decomressed_data_len);
+  debug!("Expected decomressed_data len: {}", expected_decomressed_data_len);
 
   #[inline]
   fn read_uncompressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
@@ -85,7 +93,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
       _ => unreachable!()
     }
   }
-  // stdio::stderr().write_line(format!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), expected_decomressed_data_len).as_slice()).unwrap();
+  debug!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), expected_decomressed_data_len);
   Ok(decomressed_data)
 }
 
@@ -147,25 +155,25 @@ mod tests {
     return;
     //NOT IMPLEMENTED. Need good source data example.
     let data = vec!();
-    assert_eq!(::gpx::decompress_bcfz(data).unwrap(), vec!());
+    assert_eq!(super::decompress_bcfz(data).unwrap(), vec!());
   }
 
   #[test]
   pub fn test_check_file_type(){
-    use gpx::GpxFileType;
+    use super::GpxFileType;
     let data_bcfs = [0x42, 0x43, 0x46, 0x53];
     let data_bcfz = [0x42, 0x43, 0x46, 0x5a];
     let data_random = [0xde, 0xad, 0xbe, 0xef];
-    assert!(match ::gpx::check_file_type(data_bcfs) {
-      ::gpx::BCFS => true,
+    assert!(match super::check_file_type(data_bcfs) {
+      super::BCFS => true,
       _ => false
     });
-    assert!(match ::gpx::check_file_type(data_bcfz) {
-      ::gpx::BCFZ => true,
+    assert!(match super::check_file_type(data_bcfz) {
+      super::BCFZ => true,
       _ => false
     });
-    assert!(match ::gpx::check_file_type(data_random) {
-      ::gpx::Unknown => true,
+    assert!(match super::check_file_type(data_random) {
+      super::Unknown => true,
       _ => false
     });
   }

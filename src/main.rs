@@ -1,9 +1,6 @@
-extern crate serialize;
+extern crate gpx;
 
-mod gpx;
-mod bitbuffer;
-
-fn main(){
+fn main() {
   use std::io::fs::File;
   let args = std::os::args();
   let stream = if args.len() > 1 {
@@ -13,6 +10,9 @@ fn main(){
     stdin.read_to_end()
   };
   let file_data = stream.unwrap();
-  let files = gpx::read(file_data).unwrap();
-  println!("{}", files);
+  let files = match gpx::read(file_data){
+    Ok(files) => files,
+    Err(error) => fail!(error)
+  };
+  // println!("{}", files);
 }
