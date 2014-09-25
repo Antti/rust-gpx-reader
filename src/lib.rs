@@ -26,7 +26,7 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
   match check_file_type(data.as_slice()){
     BCFZ => {
       debug!("File type BCFZ");
-      let data = Vec::from_slice(data.slice_from(4));
+      let data = data.slice_from(4).to_vec();
       let bcfs_data = match decompress_bcfz(data) {
         Err(err) => return Err(err.desc.to_string()),
         Ok(data) => data
@@ -42,7 +42,7 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
     },
     BCFS => {
       debug!("File type BCFS");
-      let data = Vec::from_slice(data.slice_from(4));
+      let data = data.slice_from(4).to_vec();
       decompress_bcfs(data).map_err(|e| e.desc.to_string())
     },
     Unknown => Err("Unknown file type".to_string())
@@ -126,7 +126,7 @@ pub fn decompress_bcfs(data: Vec<u8>) -> IoResult<Vec<File>> {
         }
         offset = (block as i64) * sector_size;
         try!(reader.seek(offset, SeekSet));
-        file_data = file_data.append(try!(reader.read_exact(sector_size as uint)).as_slice());
+        file_data.extend(try!(reader.read_exact(sector_size as uint)).into_iter());
         block_count += 1;
       }
 
