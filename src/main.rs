@@ -12,7 +12,7 @@ fn main() {
   let file_data = stream.unwrap();
   let files = match gpx::read(file_data){
     Ok(files) => files,
-    Err(error) => fail!(error)
+    Err(error) => panic!(error)
   };
   println!("{}", files);
 }
