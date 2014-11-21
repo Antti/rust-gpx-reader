@@ -1,7 +1,9 @@
 [package]
 name = "gpx_reader"
-version = "0.0.1"
+version = "0.0.2"
 authors = [ "Andrii Dmytrenko <refresh.xss@gmail.com>" ]
+description = "Guitar Pro GPX file format parser"
+license = "MIT/BSD-2-Clause"
 
 [[bin]]
 name = "gpx_reader"
@@ -9,7 +11,3 @@ name = "gpx_reader"
 [lib]
 name = "gpx"
 path = "src/lib.rs"
-
-# [[lib]]
-# name = "rb_gpx"
-# path = "src/ruby_lib.rs"

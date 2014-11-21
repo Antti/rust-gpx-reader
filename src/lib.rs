@@ -24,7 +24,7 @@ pub struct File {
 pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
   debug!("Reading file...");
   match check_file_type(data.as_slice()){
-    BCFZ => {
+    GpxFileType::BCFZ => {
       debug!("File type BCFZ");
       let data = data.slice_from(4).to_vec();
       let bcfs_data = match decompress_bcfz(data) {
@@ -32,28 +32,28 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
         Ok(data) => data
       };
       match check_file_type(bcfs_data.as_slice()) {
-        BCFS => {
+        GpxFileType::BCFS => {
           debug!("Decompressed BCFZ, found BCFS inside");
           decompress_bcfs(bcfs_data.slice_from(4).to_vec()).map_err(|e| e.desc.to_string())
         },
-        BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
-        Unknown => Err("BCFZ file didn't contain BCFS inside".to_string())
+        GpxFileType::BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
+        GpxFileType::Unknown => Err("BCFZ file didn't contain BCFS inside".to_string())
       }
     },
-    BCFS => {
+    GpxFileType::BCFS => {
       debug!("File type BCFS");
       let data = data.slice_from(4).to_vec();
       decompress_bcfs(data).map_err(|e| e.desc.to_string())
     },
-    Unknown => Err("Unknown file type".to_string())
+    GpxFileType::Unknown => Err("Unknown file type".to_string())
   }
 }
 
 pub fn check_file_type(data: &[u8]) -> GpxFileType {
   match data.slice(0, 4) {
-    [0x42, 0x43, 0x46, 0x53] => BCFS,
-    [0x42, 0x43, 0x46, 0x5a] => BCFZ,
-    _ => Unknown
+    [0x42, 0x43, 0x46, 0x53] => GpxFileType::BCFS,
+    [0x42, 0x43, 0x46, 0x5a] => GpxFileType::BCFZ,
+    _ => GpxFileType::Unknown
   }
 }
 
@@ -146,9 +146,6 @@ pub fn decompress_bcfs(data: Vec<u8>) -> IoResult<Vec<File>> {
 
 #[cfg(test)]
 mod tests {
-  use std::io::MemReader;
-  use bitbuffer::BitBuffer;
-
   #[allow(unreachable_code)]
   #[test]
   pub fn test_load_bcfz(){
@@ -164,16 +161,16 @@ mod tests {
     let data_bcfs = [0x42, 0x43, 0x46, 0x53];
     let data_bcfz = [0x42, 0x43, 0x46, 0x5a];
     let data_random = [0xde, 0xad, 0xbe, 0xef];
-    assert!(match super::check_file_type(data_bcfs) {
-      super::BCFS => true,
+    assert!(match super::check_file_type(&data_bcfs) {
+      GpxFileType::BCFS => true,
       _ => false
     });
-    assert!(match super::check_file_type(data_bcfz) {
-      super::BCFZ => true,
+    assert!(match super::check_file_type(&data_bcfz) {
+      GpxFileType::BCFZ => true,
       _ => false
     });
-    assert!(match super::check_file_type(data_random) {
-      super::Unknown => true,
+    assert!(match super::check_file_type(&data_random) {
+      GpxFileType::Unknown => true,
       _ => false
     });
   }
