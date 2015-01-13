@@ -14,5 +14,5 @@ fn main() {
     Ok(files) => files,
     Err(error) => panic!(error)
   };
-  println!("{}", files);
+  println!("{:?}", files);
 }

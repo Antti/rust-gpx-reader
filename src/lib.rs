@@ -1,6 +1,6 @@
-#![feature(phase)]
-#[phase(plugin, link)] extern crate log;
-extern crate serialize;
+#[macro_use]
+extern crate log;
+extern crate "rustc-serialize" as rustc_serialize;
 
 use std::io::{IoResult, MemReader, SeekSet};
 use std::cmp;
@@ -8,14 +8,16 @@ use std::str;
 
 pub mod bitbuffer;
 
-#[deriving(Show)]
+#[derive(Show)]
 pub enum GpxFileType {
   BCFS,
   BCFZ,
   Unknown
 }
 
-#[deriving(Show, Encodable)]
+impl Copy for GpxFileType{}
+
+#[derive(Show, RustcEncodable)]
 pub struct File {
   file_name: String,
   file_data: Vec<u8>
@@ -58,15 +60,15 @@ pub fn check_file_type(data: &[u8]) -> GpxFileType {
 }
 
 pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
-  let mut bb = bitbuffer::BitBuffer::new(box MemReader::new(data));
-  let expected_decomressed_data_len = try!(bb.read_le_i32()) as uint;
+  let mut bb = bitbuffer::BitBuffer::new(data.as_slice());
+  let expected_decomressed_data_len = try!(bb.read_le_i32()) as usize;
   let mut decomressed_data : Vec<u8> = Vec::with_capacity(expected_decomressed_data_len);
   debug!("Expected decomressed_data len: {}", expected_decomressed_data_len);
 
   #[inline]
-  fn read_uncompressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
+  fn read_uncompressed_chunk<T: Reader>(bb: &mut bitbuffer::BitBuffer<T>, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
     let len = try!(bb.read_bits_reversed(2));
-    for _ in range(0,len) {
+    for _ in (0..len) {
       let byte = try!(bb.read_byte());
       decomressed_data.push(byte);
     };
@@ -74,7 +76,7 @@ pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
   }
 
   #[inline]
-  fn read_compressed_chunk(bb: &mut bitbuffer::BitBuffer, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
+  fn read_compressed_chunk<T: Reader>(bb: &mut bitbuffer::BitBuffer<T>, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
     let word_size = try!(bb.read_bits(4));
     let offset = try!(bb.read_bits_reversed(word_size));
     let len = try!(bb.read_bits_reversed(word_size));
@@ -126,15 +128,15 @@ pub fn decompress_bcfs(data: Vec<u8>) -> IoResult<Vec<File>> {
         }
         offset = (block as i64) * sector_size;
         try!(reader.seek(offset, SeekSet));
-        file_data.extend(try!(reader.read_exact(sector_size as uint)).into_iter());
+        file_data.extend(try!(reader.read_exact(sector_size as usize)).into_iter());
         block_count += 1;
       }
 
       try!(reader.seek(index_file_size, SeekSet));
-      let file_size = try!(reader.read_le_i32()) as uint;
+      let file_size = try!(reader.read_le_i32()) as usize;
       if file_size <= file_data.len() {
         try!(reader.seek(index_file_name, SeekSet));
-        let file_name = str::from_utf8(try!(reader.read_exact(127)).as_slice()).unwrap().trim_right_chars('\0').to_string();
+        let file_name = str::from_utf8(try!(reader.read_exact(127)).as_slice()).unwrap().trim_right_matches('\0').to_string();
         try!(reader.seek(index_file_name, SeekSet));
         let file_bytes = file_data.slice(0, file_size);
         files.push(File{file_name: file_name.clone(), file_data: file_bytes.to_vec()});

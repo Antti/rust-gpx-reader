@@ -11,3 +11,8 @@ name = "gpx_reader"
 [lib]
 name = "gpx"
 path = "src/lib.rs"
+
+[dependencies]
+
+rustc-serialize = "*"
+log = "*"
