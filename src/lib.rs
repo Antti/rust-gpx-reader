@@ -1,14 +1,17 @@
+#![feature(old_io)]
+#![feature(collections)]
+
 #[macro_use]
 extern crate log;
 extern crate "rustc-serialize" as rustc_serialize;
 
-use std::io::{IoResult, MemReader, SeekSet};
+use std::old_io::{IoResult, MemReader, SeekSet};
 use std::cmp;
 use std::str;
 
 pub mod bitbuffer;
 
-#[derive(Show)]
+#[derive(Debug)]
 pub enum GpxFileType {
   BCFS,
   BCFZ,
@@ -17,7 +20,7 @@ pub enum GpxFileType {
 
 impl Copy for GpxFileType{}
 
-#[derive(Show, RustcEncodable)]
+#[derive(Debug, RustcEncodable)]
 pub struct File {
   file_name: String,
   file_data: Vec<u8>
@@ -25,18 +28,18 @@ pub struct File {
 
 pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
   debug!("Reading file...");
-  match check_file_type(data.as_slice()){
+  match check_file_type(&data[..]){
     GpxFileType::BCFZ => {
       debug!("File type BCFZ");
-      let data = data.slice_from(4).to_vec();
+      let data = data[4..].to_vec();
       let bcfs_data = match decompress_bcfz(data) {
         Err(err) => return Err(err.desc.to_string()),
         Ok(data) => data
       };
-      match check_file_type(bcfs_data.as_slice()) {
+      match check_file_type(&bcfs_data[..]) {
         GpxFileType::BCFS => {
           debug!("Decompressed BCFZ, found BCFS inside");
-          decompress_bcfs(bcfs_data.slice_from(4).to_vec()).map_err(|e| e.desc.to_string())
+          decompress_bcfs(bcfs_data[4..].to_vec()).map_err(|e| e.desc.to_string())
         },
         GpxFileType::BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
         GpxFileType::Unknown => Err("BCFZ file didn't contain BCFS inside".to_string())
@@ -44,7 +47,7 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
     },
     GpxFileType::BCFS => {
       debug!("File type BCFS");
-      let data = data.slice_from(4).to_vec();
+      let data = data[4..].to_vec();
       decompress_bcfs(data).map_err(|e| e.desc.to_string())
     },
     GpxFileType::Unknown => Err("Unknown file type".to_string())
@@ -52,7 +55,7 @@ pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
 }
 
 pub fn check_file_type(data: &[u8]) -> GpxFileType {
-  match data.slice(0, 4) {
+  match &data[0..4] {
     [0x42, 0x43, 0x46, 0x53] => GpxFileType::BCFS,
     [0x42, 0x43, 0x46, 0x5a] => GpxFileType::BCFZ,
     _ => GpxFileType::Unknown
@@ -60,7 +63,7 @@ pub fn check_file_type(data: &[u8]) -> GpxFileType {
 }
 
 pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
-  let mut bb = bitbuffer::BitBuffer::new(data.as_slice());
+  let mut bb = bitbuffer::BitBuffer::new(&data[..]);
   let expected_decomressed_data_len = try!(bb.read_le_i32()) as usize;
   let mut decomressed_data : Vec<u8> = Vec::with_capacity(expected_decomressed_data_len);
   debug!("Expected decomressed_data len: {}", expected_decomressed_data_len);
@@ -82,8 +85,8 @@ pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
     let len = try!(bb.read_bits_reversed(word_size));
     let source_position = decomressed_data.len() - offset;
     let to_read = cmp::min(len, offset);
-    let slice = decomressed_data.slice(source_position, source_position+to_read).to_vec();
-    decomressed_data.push_all(slice.as_slice());
+    let slice = &decomressed_data[source_position..source_position+to_read].to_vec();
+    decomressed_data.push_all(slice);
     Ok(())
   }
 
@@ -136,9 +139,9 @@ pub fn decompress_bcfs(data: Vec<u8>) -> IoResult<Vec<File>> {
       let file_size = try!(reader.read_le_i32()) as usize;
       if file_size <= file_data.len() {
         try!(reader.seek(index_file_name, SeekSet));
-        let file_name = str::from_utf8(try!(reader.read_exact(127)).as_slice()).unwrap().trim_right_matches('\0').to_string();
+        let file_name = str::from_utf8(&try!(reader.read_exact(127))).unwrap().trim_right_matches('\0').to_string();
         try!(reader.seek(index_file_name, SeekSet));
-        let file_bytes = file_data.slice(0, file_size);
+        let file_bytes = &file_data[0..file_size];
         files.push(File{file_name: file_name.clone(), file_data: file_bytes.to_vec()});
       }
     }

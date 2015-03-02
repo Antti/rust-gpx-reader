@@ -1,4 +1,4 @@
-use std::io::{Reader, IoResult};
+use std::old_io::{Reader, IoResult};
 
 pub struct BitBuffer<T: Reader> {
   buffer: T,
@@ -34,7 +34,7 @@ impl <T: Reader> BitBuffer<T> {
 
   // bigEndian MSB
   pub fn read_bits(&mut self, count: usize) -> IoResult<usize> {
-    let mut word = 0us;
+    let mut word = 0usize;
     for idx in (0..count) {
       let bit = try!(self.read_bit());
       word = word | ((bit as usize) << (count - 1 - idx));
@@ -43,7 +43,7 @@ impl <T: Reader> BitBuffer<T> {
   }
 
   pub fn read_bits_reversed(&mut self, count: usize) -> IoResult<usize> {
-    let mut word = 0us;
+    let mut word = 0usize;
     for idx in (0..count) {
       let bit = try!(self.read_bit());
       word = word | ((bit as usize) << idx);
@@ -58,9 +58,9 @@ mod tests {
 
   #[test]
   pub fn test_bit_buffer_read_bit(){
-    let data = vec!(0b11001010, 0b11110000);
-    println!("data: {:?}" ,data);
-    let mut bb = BitBuffer::new(data.as_slice());
+    let data : &[u8] = &[0b11001010, 0b11110000];
+    println!("data: {:?}", data);
+    let mut bb = BitBuffer::new(data);
     let bits : Vec<u8> = (0..16).map(|_|{
       bb.read_bit().unwrap()
     }).collect();
@@ -68,29 +68,29 @@ mod tests {
   }
   #[test]
   pub fn test_bit_buffer_read_bits_lsb_byte(){
-    let data = vec!(0b11001010, 0b11110000);
-    let mut bb = BitBuffer::new(data.as_slice());
+    let data : &[u8] = &[0b11001010, 0b11110000];
+    let mut bb = BitBuffer::new(data);
     let bits = bb.read_bits_reversed(8).unwrap();
     assert_eq!(bits, 83);
   }
   #[test]
   pub fn test_bit_buffer_read_bits_lsb_less_then_byte(){
-    let data = vec!(0b11001010, 0b11110000);
-    let mut bb = BitBuffer::new(data.as_slice());
+    let data : &[u8] = &[0b11001010, 0b11110000];
+    let mut bb = BitBuffer::new(data);
     let bits = bb.read_bits_reversed(7).unwrap();
     assert_eq!(bits, 83);
   }
   #[test]
   pub fn test_bit_buffer_read_bits_msb_byte(){
-    let data = vec!(0b11001010, 0b11110000);
-    let mut bb = BitBuffer::new(data.as_slice());
+    let data : &[u8] = &[0b11001010, 0b11110000];
+    let mut bb = BitBuffer::new(data);
     let bits = bb.read_bits(8).unwrap();
     assert_eq!(bits, 202);
   }
   #[test]
   pub fn test_bit_buffer_read_bits_msb_less_then_byte(){
-    let data = vec!(0b11001010, 0b11110000);
-    let mut bb = BitBuffer::new(data.as_slice());
+    let data : &[u8] = &[0b11001010, 0b11110000];
+    let mut bb = BitBuffer::new(data);
     let bits = bb.read_bits(7).unwrap();
     assert_eq!(bits, 101);
   }
