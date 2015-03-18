@@ -1,13 +1,18 @@
-#![feature(old_io)]
 #![feature(collections)]
+#![feature(io)]
 
 #[macro_use]
 extern crate log;
+extern crate env_logger;
 extern crate "rustc-serialize" as rustc_serialize;
+extern crate byteorder;
 
-use std::old_io::{IoResult, MemReader, SeekSet};
+use std::io::{self, Cursor, Read};
 use std::cmp;
 use std::str;
+use std::iter;
+
+use byteorder::{ReadBytesExt, LittleEndian};
 
 pub mod bitbuffer;
 
@@ -26,31 +31,28 @@ pub struct File {
   file_data: Vec<u8>
 }
 
-pub fn read(data: Vec<u8>) -> Result<Vec<File>, String> {
+pub fn read(data: Vec<u8>) -> io::Result<Vec<File>> {
   debug!("Reading file...");
   match check_file_type(&data[..]){
     GpxFileType::BCFZ => {
       debug!("File type BCFZ");
       let data = data[4..].to_vec();
-      let bcfs_data = match decompress_bcfz(data) {
-        Err(err) => return Err(err.desc.to_string()),
-        Ok(data) => data
-      };
+      let bcfs_data = try!(decompress_bcfz(data));
       match check_file_type(&bcfs_data[..]) {
         GpxFileType::BCFS => {
           debug!("Decompressed BCFZ, found BCFS inside");
-          decompress_bcfs(bcfs_data[4..].to_vec()).map_err(|e| e.desc.to_string())
+          decompress_bcfs(bcfs_data[4..].to_vec())
         },
-        GpxFileType::BCFZ => Err("BCFZ in BCFZ, weird...".to_string()),
-        GpxFileType::Unknown => Err("BCFZ file didn't contain BCFS inside".to_string())
+        GpxFileType::BCFZ => Err(io::Error::new(io::ErrorKind::Other, "BCFZ in BCFZ, weird...", None)),
+        GpxFileType::Unknown => Err(io::Error::new(io::ErrorKind::Other, "BCFZ file didn't contain BCFS inside", None))
       }
     },
     GpxFileType::BCFS => {
       debug!("File type BCFS");
       let data = data[4..].to_vec();
-      decompress_bcfs(data).map_err(|e| e.desc.to_string())
+      decompress_bcfs(data)
     },
-    GpxFileType::Unknown => Err("Unknown file type".to_string())
+    GpxFileType::Unknown => Err(io::Error::new(io::ErrorKind::Other, "Unknown file type", None))
   }
 }
 
@@ -62,51 +64,51 @@ pub fn check_file_type(data: &[u8]) -> GpxFileType {
   }
 }
 
-pub fn decompress_bcfz(data: Vec<u8>) -> IoResult<Vec<u8>> {
+pub fn decompress_bcfz(data: Vec<u8>) -> io::Result<Vec<u8>> {
   let mut bb = bitbuffer::BitBuffer::new(&data[..]);
-  let expected_decomressed_data_len = try!(bb.read_le_i32()) as usize;
-  let mut decomressed_data : Vec<u8> = Vec::with_capacity(expected_decomressed_data_len);
-  debug!("Expected decomressed_data len: {}", expected_decomressed_data_len);
+  let expected_decompressed_data_len = try!(bb.read_i32::<LittleEndian>()) as usize;
+  let mut decompressed_data : Vec<u8> = Vec::with_capacity(expected_decompressed_data_len);
+  debug!("Expected decompressed_data len: {}", expected_decompressed_data_len);
 
   #[inline]
-  fn read_uncompressed_chunk<T: Reader>(bb: &mut bitbuffer::BitBuffer<T>, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
+  fn read_uncompressed_chunk(bb: &mut bitbuffer::BitBuffer, decompressed_data: &mut Vec<u8>) -> io::Result<()> {
     let len = try!(bb.read_bits_reversed(2));
-    for _ in (0..len) {
-      let byte = try!(bb.read_byte());
-      decomressed_data.push(byte);
-    };
+    let mut buf : Vec<_> = iter::repeat(0u8).take(len).collect();
+    try!(bb.read(&mut buf[..]));
+    decompressed_data.extend(buf);
     Ok(())
   }
 
   #[inline]
-  fn read_compressed_chunk<T: Reader>(bb: &mut bitbuffer::BitBuffer<T>, decomressed_data: &mut Vec<u8>) -> IoResult<()> {
+  fn read_compressed_chunk(bb: &mut bitbuffer::BitBuffer, decompressed_data: &mut Vec<u8>) -> io::Result<()> {
     let word_size = try!(bb.read_bits(4));
     let offset = try!(bb.read_bits_reversed(word_size));
     let len = try!(bb.read_bits_reversed(word_size));
-    let source_position = decomressed_data.len() - offset;
+    assert!(decompressed_data.len() >= offset);
+    let source_position = decompressed_data.len() - offset;
     let to_read = cmp::min(len, offset);
-    let slice = &decomressed_data[source_position..source_position+to_read].to_vec();
-    decomressed_data.push_all(slice);
+    let slice = &decompressed_data[source_position..source_position+to_read].to_vec();
+    decompressed_data.push_all(slice);
     Ok(())
   }
 
-  while decomressed_data.len() < expected_decomressed_data_len {
+  while decompressed_data.len() < expected_decompressed_data_len {
     let bit = try!(bb.read_bit());
     match bit {
-      0 => { try!(read_uncompressed_chunk(&mut bb, &mut decomressed_data)) },
-      1 => { try!(read_compressed_chunk(&mut bb, &mut decomressed_data)) },
+      0 => { try!(read_uncompressed_chunk(&mut bb, &mut decompressed_data)) },
+      1 => { try!(read_compressed_chunk(&mut bb, &mut decompressed_data)) },
       _ => unreachable!()
     }
   }
-  debug!("Successfully decompressed data. Len: {}, Expected len: {}", decomressed_data.len(), expected_decomressed_data_len);
-  Ok(decomressed_data)
+  debug!("Successfully decompressed data. Len: {}, Expected len: {}", decompressed_data.len(), expected_decompressed_data_len);
+  Ok(decompressed_data)
 }
 
-pub fn decompress_bcfs(data: Vec<u8>) -> IoResult<Vec<File>> {
-  let data_len = data.len() as i64;
-  let sector_size = 0x1000i64;
-  let mut reader = MemReader::new(data);
-  let mut offset = 0i64;
+pub fn decompress_bcfs(data: Vec<u8>) -> io::Result<Vec<File>> {
+  let data_len = data.len() as u64;
+  let sector_size = 0x1000u64;
+  let mut reader = Cursor::new(data);
+  let mut offset = 0u64;
   let mut files : Vec<File> = vec!();
 
   loop {
@@ -114,33 +116,37 @@ pub fn decompress_bcfs(data: Vec<u8>) -> IoResult<Vec<File>> {
     if offset + 3 >= data_len {
       break;
     }
-    try!(reader.seek(offset, SeekSet));
-    if try!(reader.read_le_i32()) == 2 {
+    reader.set_position(offset)  ;
+    if try!(reader.read_i32::<LittleEndian>()) == 2 {
       let index_file_name = offset + 4;
       let index_file_size = offset + 0x8C;
       let index_of_block = offset + 0x94;
       let mut file_data : Vec<u8> = Vec::new();
 
       let mut block;
-      let mut block_count = 0i64;
+      let mut block_count = 0u64;
       loop {
-        try!(reader.seek(index_of_block + (4*block_count), SeekSet));
-        block = try!(reader.read_le_i32());
+        reader.set_position((index_of_block + (4*block_count)));
+        block = try!(reader.read_i32::<LittleEndian>());
         if block == 0 {
           break;
         }
-        offset = (block as i64) * sector_size;
-        try!(reader.seek(offset, SeekSet));
-        file_data.extend(try!(reader.read_exact(sector_size as usize)).into_iter());
+        offset = (block as u64) * sector_size;
+        reader.set_position(offset);
+        let mut buf : Vec<_> = iter::repeat(0u8).take(sector_size as usize).collect();
+        try!(reader.read(&mut buf[..]));
+        file_data.extend(buf);
         block_count += 1;
       }
 
-      try!(reader.seek(index_file_size, SeekSet));
-      let file_size = try!(reader.read_le_i32()) as usize;
+      reader.set_position(index_file_size);
+      let file_size = try!(reader.read_i32::<LittleEndian>()) as usize;
       if file_size <= file_data.len() {
-        try!(reader.seek(index_file_name, SeekSet));
-        let file_name = str::from_utf8(&try!(reader.read_exact(127))).unwrap().trim_right_matches('\0').to_string();
-        try!(reader.seek(index_file_name, SeekSet));
+        reader.set_position(index_file_name);
+        let mut buf : Vec<_> = iter::repeat(0u8).take(127).collect();
+        try!(reader.read(&mut buf[..]));
+        let file_name = str::from_utf8(&buf[..]).unwrap().trim_right_matches('\0').to_string();
+        reader.set_position(index_file_name);
         let file_bytes = &file_data[0..file_size];
         files.push(File{file_name: file_name.clone(), file_data: file_bytes.to_vec()});
       }

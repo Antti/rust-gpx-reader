@@ -15,3 +15,5 @@ path = "src/lib.rs"
 [dependencies]
 rustc-serialize = "*"
 log = "*"
+env_logger = "*"
+byteorder = "*"
