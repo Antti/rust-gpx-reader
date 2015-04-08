@@ -1,10 +1,10 @@
 #![feature(collections)]
-#![feature(io)]
+#![feature(slice_patterns)]
 
 #[macro_use]
 extern crate log;
 extern crate env_logger;
-extern crate "rustc-serialize" as rustc_serialize;
+extern crate rustc_serialize;
 extern crate byteorder;
 
 use std::io::{self, Cursor, Read};
@@ -16,7 +16,7 @@ use byteorder::{ReadBytesExt, LittleEndian};
 
 pub mod bitbuffer;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GpxFileType {
   BCFS,
   BCFZ,
@@ -43,8 +43,8 @@ pub fn read(data: Vec<u8>) -> io::Result<Vec<File>> {
           debug!("Decompressed BCFZ, found BCFS inside");
           decompress_bcfs(bcfs_data[4..].to_vec())
         },
-        GpxFileType::BCFZ => Err(io::Error::new(io::ErrorKind::Other, "BCFZ in BCFZ, weird...", None)),
-        GpxFileType::Unknown => Err(io::Error::new(io::ErrorKind::Other, "BCFZ file didn't contain BCFS inside", None))
+        GpxFileType::BCFZ => Err(io::Error::new(io::ErrorKind::Other, "BCFZ in BCFZ, weird...")),
+        GpxFileType::Unknown => Err(io::Error::new(io::ErrorKind::Other, "BCFZ file didn't contain BCFS inside"))
       }
     },
     GpxFileType::BCFS => {
@@ -52,7 +52,7 @@ pub fn read(data: Vec<u8>) -> io::Result<Vec<File>> {
       let data = data[4..].to_vec();
       decompress_bcfs(data)
     },
-    GpxFileType::Unknown => Err(io::Error::new(io::ErrorKind::Other, "Unknown file type", None))
+    GpxFileType::Unknown => Err(io::Error::new(io::ErrorKind::Other, "Unknown file type"))
   }
 }
 
