@@ -29,7 +29,7 @@ impl <'a> BitBuffer<'a> {
       self.byte = buf[0];
       self.bit_position = 0;
     }
-    let bit = (self.byte >> (8 - self.bit_position - 1) as usize) & 0x1; //MSB
+    let bit = (self.byte >> (7 - self.bit_position) as usize) & 0x1; //MSB
     self.bit_position += 1;
     Ok(bit)
   }

@@ -1,4 +1,4 @@
-Rust gpx reader
+Rust gpx reader [![Build Status](https://travis-ci.org/Antti/rust-gpx-reader.svg)](https://travis-ci.org/Antti/rust-gpx-reader)
 ===============
 
 ###Reads GuitarPro 6 compressed gpx file with BCFZ compression.

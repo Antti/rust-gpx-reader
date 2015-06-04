@@ -116,7 +116,7 @@ pub fn decompress_bcfs(data: Vec<u8>) -> io::Result<Vec<File>> {
     if offset + 3 >= data_len {
       break;
     }
-    reader.set_position(offset)  ;
+    reader.set_position(offset);
     if try!(reader.read_i32::<LittleEndian>()) == 2 {
       let index_file_name = offset + 4;
       let index_file_size = offset + 0x8C;
