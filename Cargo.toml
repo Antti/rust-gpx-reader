@@ -9,7 +9,7 @@ license = "MIT/BSD-2-Clause"
 name = "gpx_reader"
 
 [lib]
-name = "gpx"
+name = "guitar_tabs"
 path = "src/lib.rs"
 
 [dependencies]
