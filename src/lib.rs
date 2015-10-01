@@ -5,6 +5,7 @@ extern crate byteorder;
 extern crate encoding;
 
 pub mod gpx;
+pub mod legacy;
 pub mod error;
 mod bitbuffer;
 

@@ -9,6 +9,10 @@ license = "MIT/BSD-2-Clause"
 name = "gpx_reader"
 path = "src/bin/gpx_reader.rs"
 
+[[bin]]
+name = "gp_reader"
+path = "src/bin/gp_reader.rs"
+
 
 [lib]
 name = "guitar_tabs"
