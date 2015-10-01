@@ -1,4 +1,5 @@
 use std::io::{self, Read, Cursor};
+use super::Result;
 
 pub struct BitBuffer <'a> {
     bit_position: u8,
@@ -22,7 +23,7 @@ impl <'a> BitBuffer<'a> {
 
     // Reads bit one by one
     #[inline]
-    pub fn read_bit(&mut self) -> io::Result<u8> {
+    pub fn read_bit(&mut self) -> Result<u8> {
         if self.bit_position == 8 {
             let buf = &mut [0u8];
             try!(self.cursor.read(buf));
@@ -35,7 +36,7 @@ impl <'a> BitBuffer<'a> {
     }
 
     // bigEndian MSB
-    pub fn read_bits(&mut self, count: usize) -> io::Result<usize> {
+    pub fn read_bits(&mut self, count: usize) -> Result<usize> {
         let mut word = 0usize;
         assert!(count <= 64);
         for idx in (0..count) {
@@ -45,7 +46,7 @@ impl <'a> BitBuffer<'a> {
         Ok(word)
     }
 
-    pub fn read_bits_reversed(&mut self, count: usize) -> io::Result<usize> {
+    pub fn read_bits_reversed(&mut self, count: usize) -> Result<usize> {
         let mut word = 0usize;
         for idx in (0..count) {
             let bit = try!(self.read_bit());

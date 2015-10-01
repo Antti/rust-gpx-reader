@@ -14,7 +14,7 @@ pub enum GpxFileType {
 
 impl Copy for GpxFileType{}
 
-#[derive(Debug, RustcEncodable)]
+#[derive(Debug)]
 pub struct File {
     file_name: String,
     file_data: Vec<u8>

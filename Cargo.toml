@@ -7,6 +7,8 @@ license = "MIT/BSD-2-Clause"
 
 [[bin]]
 name = "gpx_reader"
+path = "src/bin/gpx_reader.rs"
+
 
 [lib]
 name = "guitar_tabs"
@@ -17,3 +19,4 @@ rustc-serialize = "*"
 log = "*"
 env_logger = "*"
 byteorder = "*"
+encoding = "0.2"
