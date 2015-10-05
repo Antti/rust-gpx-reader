@@ -18,6 +18,7 @@ impl fmt::Display for Error {
         write!(f, "Tab read error: {}", error::Error::description(self))
     }
 }
+
 impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
@@ -52,6 +53,13 @@ impl From<byteorder::Error> for Error {
 
 impl <'a> From<::std::borrow::Cow<'a, str>> for Error {
     fn from(err: ::std::borrow::Cow<'a, str>) -> Error {
+        Error::StringEncodingError(err.to_string())
+    }
+}
+
+#[cfg(feature = "autodetect_encoding")]
+impl From<::uchardet::EncodingDetectorError> for Error {
+    fn from(err: ::uchardet::EncodingDetectorError) -> Error {
         Error::StringEncodingError(err.to_string())
     }
 }

@@ -13,10 +13,12 @@ path = "src/bin/gpx_reader.rs"
 name = "gp_reader"
 path = "src/bin/gp_reader.rs"
 
-
 [lib]
 name = "guitar_tabs"
 path = "src/lib.rs"
+
+[features]
+autodetect_encoding = ["uchardet"]
 
 [dependencies]
 rustc-serialize = "*"
@@ -24,3 +26,4 @@ log = "*"
 env_logger = "*"
 byteorder = "*"
 encoding = "0.2"
+uchardet = { version = "*", optional = true }

@@ -6,7 +6,8 @@ use encoding::codec::singlebyte::SingleByteEncoding;
 use super::super::Result;
 use super::super::error::Error;
 
-const GPENCODING: &'static SingleByteEncoding  = ::encoding::all::WINDOWS_1251;
+const DEFAULT_GPENCODING: &'static SingleByteEncoding  = ::encoding::all::WINDOWS_1252;
+const MAX_STRING_SIZE: usize  = 65536;
 
 pub trait IoReader: Read {
     fn skip(&mut self, n_bytes: i64) -> Result<()> {
@@ -82,6 +83,9 @@ pub trait IoReader: Read {
     // which is used to truncate read string.
     fn read_string(&mut self, size: usize, length: Option<usize>) -> Result<String> {
         debug!("Reading size:{size}, length:{length:?}", size=size, length=length);
+        if size > MAX_STRING_SIZE {
+            return Err(Error::FormatError(format!("Requested to read {} bytes string, to much...", size)));
+        }
         let need_to_read = match length {
             None => size,
             Some(_) if size > 0 => size,
@@ -89,7 +93,7 @@ pub trait IoReader: Read {
         };
         if let Some(len) = length {
             if len > need_to_read {
-                return Err(Error::FormatError(format!("Requested to return {} bytes, but will read only {}", len, need_to_read)));
+                return Err(Error::FormatError(format!("Requested to return {} bytes, but will read only {} (len > size)", len, need_to_read)));
             }
         }
         let mut buf : Vec<u8> = vec![0u8; need_to_read];
@@ -101,9 +105,31 @@ pub trait IoReader: Read {
             Some(len) => &buf[0..len],
             None => &buf as &[u8]
         };
-        let s = try!(GPENCODING.decode(truncated_buf, DecoderTrap::Replace));
+        let s = try!(convert_to_string(truncated_buf));
         Ok(s)
     }
+}
+
+#[cfg(not(feature = "autodetect_encoding"))]
+fn convert_to_string(buf: &[u8]) -> Result<String> {
+    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(|e| From::from(e))
+}
+
+#[cfg(feature = "autodetect_encoding")]
+fn convert_to_string(buf: &[u8]) -> Result<String> {
+    match &try!(::uchardet::detect_encoding_name(buf)).unwrap_or("DEFAULT".to_string()) as &str {
+        "windows-1251" => ::encoding::all::WINDOWS_1251.decode(buf, DecoderTrap::Replace),
+        "windows-1252" => ::encoding::all::WINDOWS_1252.decode(buf, DecoderTrap::Replace),
+        "UTF-8" => ::encoding::all::UTF_8.decode(buf, DecoderTrap::Replace),
+        "ISO-8859-7" => ::encoding::all::ISO_8859_7.decode(buf, DecoderTrap::Replace),
+        "KOI8-R" => ::encoding::all::WINDOWS_1251.decode(buf, DecoderTrap::Replace), // It's probably 1251 anyway
+        "x-mac-cyrillic" => ::encoding::all::WINDOWS_1251.decode(buf, DecoderTrap::Replace), // It's probably 1251 anyway
+        "windows-1255" => ::encoding::all::WINDOWS_1251.decode(buf, DecoderTrap::Replace), // It's probably 1251 anyway
+        "ISO-8859-8" => ::encoding::all::WINDOWS_1251.decode(buf, DecoderTrap::Replace), // It's probably 1251 anyway
+        "DEFAULT" => DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace), // Error detecting, probably not enough data
+        enc => {println!("Detected unhandled encoding: {}", enc); DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace)}
+        // None =>
+    }.map_err(|e| From::from(e))
 }
 
 impl <T: Read> IoReader for T {}

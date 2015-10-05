@@ -4,6 +4,9 @@ extern crate env_logger;
 extern crate byteorder;
 extern crate encoding;
 
+#[cfg(feature = "autodetect_encoding")]
+extern crate uchardet;
+
 pub mod gpx;
 pub mod legacy;
 pub mod error;
