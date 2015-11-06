@@ -1,6 +1,6 @@
 use std::default::Default;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TripletFeel {
     None,
     Eighth,
@@ -27,7 +27,7 @@ pub struct SongInfo {
     pub notice: Vec<String>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Duration {
     QuarterTime
 }
@@ -39,7 +39,7 @@ impl Default for Duration {
 }
 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TimeSignature {
     pub numerator: i8,
     pub denominator: i8, //TODO: Duration
@@ -52,16 +52,29 @@ impl Default for TimeSignature {
     }
 }
 
-#[derive(Debug, Default)]
-pub struct KeySignature;
-//
-// impl Default for TimeSignature {
-//     fn default() -> Self {
-//         TimeSignature { numerator: 0, denominator: 0, beams: vec![] }
-//     }
-// }
+#[derive(Debug, Default, Clone)]
+pub struct KeySignature {
+    pub root: i8,
+    pub signature_type: i8
+}
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
+pub struct Marker {
+    pub title: String,
+    pub color: Color
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Color {
+    pub r: u8,
+    pub g: u8,
+    pub b: u8
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct Direction;
+
+#[derive(Debug, Default, Clone)]
 pub struct MeasureHeader {
     pub number: u16,
     pub start: Duration,
@@ -70,10 +83,13 @@ pub struct MeasureHeader {
     pub tempo: u16,
     pub triplet_feel: TripletFeel,
     pub is_repeat_open: bool,
-    pub repeat_close: i16,
-    pub repeat_alternative: u16,
+    pub repeat_close: bool,
+    pub repeat_alternative: u8,
     pub real_start: i16,
-    pub has_double_bar: bool
+    pub has_double_bar: bool,
+    pub marker: Option<Marker>,
+    pub direction: Option<Direction>,
+    pub from_direction: Option<Direction>
 }
 
 #[derive(Debug)]

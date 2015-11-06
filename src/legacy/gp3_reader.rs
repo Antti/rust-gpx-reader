@@ -1,6 +1,6 @@
 use super::io_reader::IoReader;
 use super::super::{Result, Error};
-use super::song::{SongInfo, Song, Channel, MeasureHeader, TimeSignature, TripletFeel};
+use super::song::{SongInfo, Song, Channel, MeasureHeader, TimeSignature, TripletFeel, Duration, KeySignature, Marker, Color};
 
 use std::default::Default;
 use std::cmp::{max, min};
@@ -44,13 +44,13 @@ pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
     let measure_count = try!(io.read_int());
     let track_count = try!(io.read_int());
 
-    // try!(read_measure_headers(&mut io, measure_count));
+    let measure_headers = try!(read_measure_headers(&mut io, measure_count as u16));
     // try!(read_tracks(&mut io, track_count, channels);
     // try!(read_measures(&mut io, song));
     let song = Song {
         song_info: song_info, triplet_feel: Some(triplet_feel), tempo: tempo,
         channels: channels,
-        measure_headers: vec![], tracks: vec![]
+        measure_headers: measure_headers, tracks: vec![]
     };
     Ok(song)
 }
@@ -200,12 +200,10 @@ fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>> where T: IoReader {
 
 
 fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<MeasureHeader>> where T: IoReader {
+    let mut measure_headers = vec![];
     let mut previous : MeasureHeader = Default::default();
     for number in 1..measure_count + 1 {
         let flags = try!(io.read_byte());
-        let start = 0;
-        // header.tempo.value = song.tempo
-        // header.tripletFeel = self._tripletFeel
         let numerator = if flags & 0x01 > 0 {
             try!(io.read_signed_byte())
         } else {
@@ -217,16 +215,83 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<Measure
             previous.time_signature.denominator
         };
         let time_signature = TimeSignature { numerator: numerator, denominator: denominator, ..Default::default()  };
-        let is_repeat_open = (flags & 0x04 > 0);
+        let is_repeat_open = flags & 0x04 > 0;
         let repeat_close = if flags & 0x08 > 0 {
             try!(io.read_signed_byte()) > 0
         } else { false }; // TODO: Figure out if we need to use Option
         let repeat_alternative = if flags & 0x10 > 0 {
-            //readRepeatAlternative
+            try!(read_repeat_alternative(io, &measure_headers))
+        } else {
+            0
         };
+
+        let marker = if flags & 0x20 > 0 {
+            Some(try!(read_marker(io)))
+        } else {
+            None
+        };
+
+        let key_signature = if flags & 0x40 > 0 {
+            let root = try!(io.read_signed_byte());
+            let signature_type = try!(io.read_signed_byte());
+            KeySignature { root: root, signature_type: signature_type }
+        } else if number > 1 {
+            previous.key_signature
+        } else {
+            Default::default()
+        };
+
+        let has_double_bar = flags & 0x80 > 1;
+
         // TODO: Finish
+        let measure_header = MeasureHeader {
+            number: number,
+            start: Duration::QuarterTime,
+            time_signature: time_signature,
+            key_signature: key_signature,
+            tempo: 0, // song.tempo
+            triplet_feel: TripletFeel::None, //song.triplet_feel
+            is_repeat_open: is_repeat_open,
+            repeat_close: repeat_close,
+            repeat_alternative: repeat_alternative,
+            real_start: -1, // TODO: Figure this out
+            has_double_bar: has_double_bar,
+            marker: marker,
+            direction: None,
+            from_direction: None
+        };
+        previous = measure_header.clone();
+        measure_headers.push(measure_header);
     }
-    Ok(vec![previous])
+    Ok(measure_headers)
+}
+
+// The markers are written in two steps. First is written an integer
+// equal to the marker's name length + 1, then a string containing the
+// marker's name. Finally the marker's color is written.
+
+fn read_marker<T>(io: &mut T) -> Result<Marker> where T: IoReader {
+    let title = try!(io.read_int_byte_sized_string());
+    let color = try!(read_color(io));
+    Ok(Marker { title: title, color: color })
+}
+
+// Colors are used by :class:`guitarpro.base.Marker` and
+// :class:`guitarpro.base.Track`. They consist of 3 consecutive bytes and
+// one blank byte.
+
+fn read_color<T>(io: &mut T) -> Result<Color> where T: IoReader {
+    let r = try!(io.read_byte());
+    let g = try!(io.read_byte());
+    let b = try!(io.read_byte());
+    try!(io.skip(1)); //alpha?
+    Ok(Color { r: r, g: g, b: b })
+}
+
+fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> Result<u8> where T: IoReader {
+    let value = try!(io.read_byte());
+    // let existing_alternatives = 0;
+    Ok(value)
 }
 
 fn to_channel_short(data: u8) -> i16 {
