@@ -25,10 +25,7 @@ impl <'a> BitBuffer<'a> {
     #[inline]
     pub fn read_bit(&mut self) -> Result<u8> {
         if self.bit_position == 8 {
-            let buf = &mut [0u8];
-            try!(self.cursor.read(buf));
-            self.byte = buf[0];
-            self.bit_position = 0;
+            try!(self.read_next_byte());
         }
         let bit = (self.byte >> (7 - self.bit_position) as usize) & 0x1; //MSB
         self.bit_position += 1;
@@ -39,7 +36,7 @@ impl <'a> BitBuffer<'a> {
     pub fn read_bits(&mut self, count: usize) -> Result<usize> {
         let mut word = 0usize;
         assert!(count <= 64);
-        for idx in (0..count) {
+        for idx in 0..count {
             let bit = try!(self.read_bit());
             word = word | ((bit as usize) << (count - 1 - idx));
         }
@@ -48,11 +45,20 @@ impl <'a> BitBuffer<'a> {
 
     pub fn read_bits_reversed(&mut self, count: usize) -> Result<usize> {
         let mut word = 0usize;
-        for idx in (0..count) {
+        assert!(count <= 64);
+        for idx in 0..count {
             let bit = try!(self.read_bit());
             word = word | ((bit as usize) << idx);
         }
         Ok(word)
+    }
+
+    fn read_next_byte(&mut self) -> Result<()> {
+        let buf = &mut [0u8];
+        try!(self.cursor.read(buf));
+        self.byte = buf[0];
+        self.bit_position = 0;
+        Ok(())
     }
 }
 

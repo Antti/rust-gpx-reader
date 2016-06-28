@@ -1,5 +1,4 @@
 use std::io;
-use byteorder;
 use std::convert::From;
 use std::error;
 use std::fmt;
@@ -8,7 +7,6 @@ use std::fmt;
 #[derive(Debug)]
 pub enum Error {
     IoError(io::Error),
-    ByteOrderError(byteorder::Error),
     StringEncodingError(String),
     FormatError(String)
 }
@@ -23,7 +21,6 @@ impl error::Error for Error {
     fn description(&self) -> &str {
         match self {
             &Error::IoError(_) => "IoError",
-            &Error::ByteOrderError(_) => "Byte Order Error",
             &Error::StringEncodingError(_) => "String Encoding Error",
             &Error::FormatError(_) => "File format Error"
         }
@@ -32,7 +29,6 @@ impl error::Error for Error {
     fn cause(&self) -> Option<&error::Error> {
         match self {
             &Error::IoError(ref err) => Some(err),
-            &Error::ByteOrderError(ref err) => Some(err),
             &Error::StringEncodingError(_) => None,
             &Error::FormatError(_) => None
         }
@@ -42,12 +38,6 @@ impl error::Error for Error {
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Error {
         Error::IoError(err)
-    }
-}
-
-impl From<byteorder::Error> for Error {
-    fn from(err: byteorder::Error) -> Error {
-        Error::ByteOrderError(err)
     }
 }
 

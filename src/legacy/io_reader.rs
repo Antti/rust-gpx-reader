@@ -11,7 +11,7 @@ const MAX_STRING_SIZE: usize  = 65536;
 
 pub trait IoReader: Read {
     fn skip(&mut self, n_bytes: i64) -> Result<()> {
-        for _ in (0..n_bytes) {
+        for _ in 0..n_bytes {
             try!(self.read_byte());
         }
         Ok(())
@@ -41,22 +41,22 @@ pub trait IoReader: Read {
 
     // Read 2 little-endian bytes as a short integer.
     fn read_short(&mut self) -> Result<i16> {
-        self.read_i16::<LittleEndian>().map_err(|err| Error::from(err))
+        self.read_i16::<LittleEndian>().map_err(Error::from)
     }
 
     // Read 4 little-endian bytes an integer.
     fn read_int(&mut self) -> Result<i32> {
-        self.read_i32::<LittleEndian>().map_err(|err| Error::from(err))
+        self.read_i32::<LittleEndian>().map_err(Error::from)
     }
 
     // Read 4 little-endian bytes as a float.
     fn read_float(&mut self) -> Result<f32> {
-        self.read_f32::<LittleEndian>().map_err(|err| Error::from(err))
+        self.read_f32::<LittleEndian>().map_err(Error::from)
     }
 
     // Read 8 little-endian bytes as a float.
     fn read_double(&mut self) -> Result<f64> {
-        self.read_f64::<LittleEndian>().map_err(|err| Error::from(err))
+        self.read_f64::<LittleEndian>().map_err(Error::from)
     }
 
     // Read length of the string stored in 1 byte and followed by character bytes.
@@ -112,7 +112,7 @@ pub trait IoReader: Read {
 
 #[cfg(not(feature = "autodetect_encoding"))]
 fn convert_to_string(buf: &[u8]) -> Result<String> {
-    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(|e| From::from(e))
+    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(Error::from)
 }
 
 #[cfg(feature = "autodetect_encoding")]
@@ -129,7 +129,7 @@ fn convert_to_string(buf: &[u8]) -> Result<String> {
         "DEFAULT" => DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace), // Error detecting, probably not enough data
         enc => {println!("Detected unhandled encoding: {}", enc); DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace)}
         // None =>
-    }.map_err(|e| From::from(e))
+    }.map_err(Error::from)
 }
 
 impl <T: Read> IoReader for T {}

@@ -15,7 +15,7 @@ fn main() {
     } else {
         Box::new(std::io::stdin())
     };
-    let mut gpf = GPFile::new(io);
+    let gpf = GPFile::new(io);
     let info = gpf.read().unwrap();
     println!("{}: {:?}", args[1], info);
 }

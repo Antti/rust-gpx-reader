@@ -147,10 +147,9 @@ mod tests {
     #[allow(unreachable_code)]
     #[test]
     pub fn test_load_bcfz(){
-        return;
         //NOT IMPLEMENTED. Need good source data example.
-        let data = vec!();
-        assert_eq!(super::decompress_bcfz(&data).unwrap(), vec!());
+        // let data = vec!();
+        // assert_eq!(super::decompress_bcfz(&data).unwrap(), vec!());
     }
 
     #[test]
