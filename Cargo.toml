@@ -27,3 +27,4 @@ env_logger = "*"
 byteorder = "*"
 encoding = "0.2"
 uchardet = { version = "*", optional = true }
+error-chain = "*"

@@ -1,5 +1,5 @@
 use super::io_reader::IoReader;
-use super::super::{Result, Error};
+use super::super::{Result, Error, ErrorKind};
 use super::Song;
 use super::version::Version;
 use super::{gp3_reader, gp4_reader, gp5_reader};
@@ -31,7 +31,7 @@ impl <T> GPFile<T> where T: IoReader {
             "FICHIER GUITAR PRO L4.06" => Ok(Version::FichierGuitarProL406),
             "FICHIER GUITAR PRO v5.00" => Ok(Version::FichierGuitarProV500),
             "FICHIER GUITAR PRO v5.10" => Ok(Version::FichierGuitarProV510),
-            unknown => Err(Error::FormatError(format!("Unsupported version: {}", unknown)))
+            unknown => Err(ErrorKind::FormatError(format!("Unsupported version: {}", unknown)).into())
         }
     }
 }

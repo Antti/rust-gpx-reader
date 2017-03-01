@@ -10,7 +10,7 @@ pub struct BitBuffer <'a> {
 impl <'a> Read for BitBuffer<'a> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         for x in 0..buf.len(){
-            buf[x] = try!(self.read_bits(8)) as u8;
+            buf[x] = self.read_bits(8).map_err(|e| io::Error::new(io::ErrorKind::Other, "error reading bits"))? as u8;
         }
         Ok(buf.len())
     }

@@ -3,8 +3,7 @@ use byteorder::{ReadBytesExt, LittleEndian};
 use encoding::{Encoding, DecoderTrap};
 use encoding::codec::singlebyte::SingleByteEncoding;
 
-use super::super::Result;
-use super::super::error::Error;
+use super::super::{Error, ErrorKind, Result};
 
 const DEFAULT_GPENCODING: &'static SingleByteEncoding  = ::encoding::all::WINDOWS_1252;
 const MAX_STRING_SIZE: usize  = 65536;
@@ -79,12 +78,12 @@ pub trait IoReader: Read {
         return self.read_byte_sized_string(size)
     }
 
-    // size is a number of bytes to read (always) and lenght, it's an optional string length,
+    // size is a number of bytes to read (always) and length, it's an optional string length,
     // which is used to truncate read string.
     fn read_string(&mut self, size: usize, length: Option<usize>) -> Result<String> {
         debug!("Reading size:{size}, length:{length:?}", size=size, length=length);
         if size > MAX_STRING_SIZE {
-            return Err(Error::FormatError(format!("Requested to read {} bytes string, to much...", size)));
+            return Err(ErrorKind::FormatError(format!("Requested to read {} bytes string, too much...", size)).into());
         }
         let need_to_read = match length {
             None => size,
@@ -93,13 +92,13 @@ pub trait IoReader: Read {
         };
         if let Some(len) = length {
             if len > need_to_read {
-                return Err(Error::FormatError(format!("Requested to return {} bytes, but will read only {} (len > size)", len, need_to_read)));
+                return Err(ErrorKind::FormatError(format!("Requested to return {} bytes, but will read only {} (len > size)", len, need_to_read)).into());
             }
         }
         let mut buf : Vec<u8> = vec![0u8; need_to_read];
         let read_count = try!(self.read(&mut buf));
         if read_count < need_to_read {
-            return Err(Error::FormatError(format!("Read {} bytes, expected {}", read_count, need_to_read)));
+            return Err(ErrorKind::FormatError(format!("Read {} bytes, expected {}", read_count, need_to_read)).into());
         }
         let truncated_buf = match length {
             Some(len) => &buf[0..len],
@@ -112,7 +111,7 @@ pub trait IoReader: Read {
 
 #[cfg(not(feature = "autodetect_encoding"))]
 fn convert_to_string(buf: &[u8]) -> Result<String> {
-    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(Error::from)
+    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(|e| ErrorKind::EncodingError.into())
 }
 
 #[cfg(feature = "autodetect_encoding")]
