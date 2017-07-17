@@ -39,9 +39,10 @@ use super::gp3_reader;
 
 pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
     let song_info = try!(gp3_reader::read_info(&mut io));
-    let triplet_feel = match try!(io.read_bool()) {
-        false => TripletFeel::None,
-        true => TripletFeel::Eighth
+    let triplet_feel = if try!(io.read_bool()) {
+        TripletFeel::Eighth
+    } else {
+        TripletFeel::None
     };
     let tempo = 0;
     let song = Song {

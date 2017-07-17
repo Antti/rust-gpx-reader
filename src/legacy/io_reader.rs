@@ -18,19 +18,19 @@ pub trait IoReader: Read {
 
     fn read_byte(&mut self) -> Result<u8> {
         let buf = &mut [0u8];
-        try!(self.read(buf));
+        try!(self.read_exact(buf));
         Ok(buf[0])
     }
 
     fn read_signed_byte(&mut self) -> Result<i8> {
         let buf = &mut [0u8];
-        try!(self.read(buf));
+        try!(self.read_exact(buf));
         Ok(buf[0] as i8)
     }
 
     fn read_bytes(&mut self, n_bytes: usize) -> Result<Vec<u8>> {
-        let mut buf = Vec::with_capacity(n_bytes);
-        try!(self.read(&mut buf));
+        let mut buf = vec![0; n_bytes];
+        try!(self.read_exact(&mut buf));
         Ok(buf)
     }
 
@@ -75,7 +75,7 @@ pub trait IoReader: Read {
     // character bytes.
     fn read_int_byte_sized_string(&mut self) -> Result<String> {
         let size = try!(self.read_int()) as usize - 1;
-        return self.read_byte_sized_string(size)
+        self.read_byte_sized_string(size)
     }
 
     // size is a number of bytes to read (always) and length, it's an optional string length,
@@ -111,7 +111,7 @@ pub trait IoReader: Read {
 
 #[cfg(not(feature = "autodetect_encoding"))]
 fn convert_to_string(buf: &[u8]) -> Result<String> {
-    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(|e| ErrorKind::EncodingError.into())
+    DEFAULT_GPENCODING.decode(buf, DecoderTrap::Replace).map_err(|_| ErrorKind::EncodingError.into())
 }
 
 #[cfg(feature = "autodetect_encoding")]

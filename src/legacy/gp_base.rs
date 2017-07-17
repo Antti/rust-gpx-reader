@@ -1,5 +1,5 @@
 use super::io_reader::IoReader;
-use super::super::{Result, Error, ErrorKind};
+use super::super::{Result, ErrorKind};
 use super::Song;
 use super::version::Version;
 use super::{gp3_reader, gp4_reader, gp5_reader};

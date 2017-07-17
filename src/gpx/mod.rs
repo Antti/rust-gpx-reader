@@ -1,19 +1,16 @@
-use std::io::{self, Cursor, Read};
+use std::io::{Cursor, Read};
 use std::cmp;
 use std::iter;
 
 use byteorder::{ReadBytesExt, LittleEndian};
 use super::bitbuffer;
-use super::{Error, Result, ErrorKind};
+use super::{Result, ErrorKind};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum GpxFileType {
     BCFS,
-    BCFZ,
-    Unknown
+    BCFZ
 }
-
-impl Copy for GpxFileType{}
 
 #[derive(Debug)]
 pub struct File {
@@ -21,39 +18,39 @@ pub struct File {
     file_data: Vec<u8>
 }
 
-pub fn read(data: Vec<u8>) -> Result<Vec<File>> {
+pub fn read(data: &[u8]) -> Result<Vec<File>> {
     debug!("Reading file...");
-    match check_file_type(&data){
-        GpxFileType::BCFZ => {
+    match check_file_type(data){
+        Some(GpxFileType::BCFZ) => {
             debug!("File type BCFZ");
             let bcfs_data = try!(decompress_bcfz(&data[4..]));
             match check_file_type(&bcfs_data) {
-                GpxFileType::BCFS => {
+                Some(GpxFileType::BCFS) => {
                     debug!("Decompressed BCFZ, found BCFS inside");
                     decompress_bcfs(&bcfs_data[4..])
-                },
-                GpxFileType::BCFZ => Err(ErrorKind::FormatError("BCFZ in BCFZ, weird...".to_string()).into()),
-                GpxFileType::Unknown => Err(ErrorKind::FormatError("BCFZ file didn't contain BCFS inside".to_string()).into())
+                }
+                Some(GpxFileType::BCFZ) => Err(ErrorKind::FormatError("BCFZ in BCFZ, weird...".to_string()).into()),
+                None => Err(ErrorKind::FormatError("BCFZ file didn't contain BCFS inside".to_string()).into())
             }
-        },
-        GpxFileType::BCFS => {
+        }
+        Some(GpxFileType::BCFS) => {
             debug!("File type BCFS");
             decompress_bcfs(&data[4..])
-        },
-        GpxFileType::Unknown => Err(ErrorKind::FormatError("Uknown file format".to_string()).into())
+        }
+        None => Err(ErrorKind::FormatError("Uknown file format".to_string()).into())
     }
 }
 
-pub fn check_file_type(data: &[u8]) -> GpxFileType {
+pub fn check_file_type(data: &[u8]) -> Option<GpxFileType> {
     match (data[0], data[1], data[2], data[3]) {
-        (0x42, 0x43, 0x46, 0x53) => GpxFileType::BCFS,
-        (0x42, 0x43, 0x46, 0x5a) => GpxFileType::BCFZ,
-        _ => GpxFileType::Unknown
+        (0x42, 0x43, 0x46, 0x53) => Some(GpxFileType::BCFS),
+        (0x42, 0x43, 0x46, 0x5a) => Some(GpxFileType::BCFZ),
+        _ => None
     }
 }
 
 pub fn decompress_bcfz(data: &[u8]) -> Result<Vec<u8>> {
-    let mut bb = bitbuffer::BitBuffer::new(&data);
+    let mut bb = bitbuffer::BitBuffer::new(data);
     let expected_decompressed_data_len = try!(bb.read_i32::<LittleEndian>()) as usize;
     let mut decompressed_data : Vec<u8> = Vec::with_capacity(expected_decompressed_data_len);
     debug!("Expected decompressed_data len: {}", expected_decompressed_data_len);
@@ -62,7 +59,7 @@ pub fn decompress_bcfz(data: &[u8]) -> Result<Vec<u8>> {
     fn read_uncompressed_chunk(bb: &mut bitbuffer::BitBuffer, decompressed_data: &mut Vec<u8>) -> Result<()> {
         let len = try!(bb.read_bits_reversed(2));
         let mut buf : Vec<_> = iter::repeat(0u8).take(len).collect();
-        try!(bb.read(&mut buf));
+        try!(bb.read_exact(&mut buf));
         decompressed_data.extend(buf);
         Ok(())
     }
@@ -100,7 +97,7 @@ pub fn decompress_bcfs(data: &[u8]) -> Result<Vec<File>> {
     let mut files = vec!();
 
     loop {
-        offset = offset + sector_size;
+        offset += sector_size;
         if offset + 3 >= data_len {
             break;
         }
@@ -114,15 +111,15 @@ pub fn decompress_bcfs(data: &[u8]) -> Result<Vec<File>> {
             let mut block;
             let mut block_count = 0u64;
             loop {
-                reader.set_position((index_of_block + (4*block_count)));
+                reader.set_position(index_of_block + (4*block_count));
                 block = try!(reader.read_i32::<LittleEndian>());
                 if block == 0 {
                     break;
                 }
                 offset = (block as u64) * sector_size;
                 reader.set_position(offset);
-                let mut buf : Vec<_> = iter::repeat(0u8).take(sector_size as usize).collect();
-                try!(reader.read(&mut buf));
+                let mut buf = vec![0; sector_size as usize];
+                try!(reader.read_exact(&mut buf));
                 file_data.extend(buf);
                 block_count += 1;
             }
@@ -131,8 +128,8 @@ pub fn decompress_bcfs(data: &[u8]) -> Result<Vec<File>> {
             let file_size = try!(reader.read_i32::<LittleEndian>()) as usize;
             if file_size <= file_data.len() {
                 reader.set_position(index_file_name);
-                let mut buf : Vec<_> = iter::repeat(0u8).take(127).collect();
-                try!(reader.read(&mut buf));
+                let mut buf = vec![0; 127];
+                try!(reader.read_exact(&mut buf));
                 let file_name = String::from_utf8_lossy(&buf).trim_right_matches('\0').to_owned();
                 reader.set_position(index_file_name);
                 let file_bytes = &file_data[0..file_size];
@@ -160,15 +157,15 @@ mod tests {
         let data_bcfz = [0x42, 0x43, 0x46, 0x5a];
         let data_random = [0xde, 0xad, 0xbe, 0xef];
         assert!(match super::check_file_type(&data_bcfs) {
-            GpxFileType::BCFS => true,
+            Some(GpxFileType::BCFS) => true,
             _ => false
         });
         assert!(match super::check_file_type(&data_bcfz) {
-            GpxFileType::BCFZ => true,
+            Some(GpxFileType::BCFZ) => true,
             _ => false
         });
         assert!(match super::check_file_type(&data_random) {
-            GpxFileType::Unknown => true,
+            None => true,
             _ => false
         });
     }

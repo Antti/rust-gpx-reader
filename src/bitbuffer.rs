@@ -9,8 +9,8 @@ pub struct BitBuffer <'a> {
 
 impl <'a> Read for BitBuffer<'a> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        for x in 0..buf.len(){
-            buf[x] = self.read_bits(8).map_err(|e| io::Error::new(io::ErrorKind::Other, "error reading bits"))? as u8;
+        for byte in buf.iter_mut() {
+            *byte = self.read_bits(8).map_err(|e| io::Error::new(io::ErrorKind::Other, "error reading bits"))? as u8;
         }
         Ok(buf.len())
     }
@@ -55,7 +55,7 @@ impl <'a> BitBuffer<'a> {
 
     fn read_next_byte(&mut self) -> Result<()> {
         let buf = &mut [0u8];
-        try!(self.cursor.read(buf));
+        try!(self.cursor.read_exact(buf));
         self.byte = buf[0];
         self.bit_position = 0;
         Ok(())

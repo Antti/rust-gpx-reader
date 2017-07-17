@@ -17,7 +17,7 @@ fn main() {
         let mut stdin = std::io::stdin();
         stdin.read_to_end(&mut file_data).unwrap();
     };
-    let files = match gpx::read(file_data){
+    let files = match gpx::read(&file_data){
         Ok(files) => files,
         Err(error) => panic!(error)
     };
