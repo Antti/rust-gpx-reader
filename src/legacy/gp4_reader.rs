@@ -1,6 +1,6 @@
 use super::io_reader::IoReader;
-use super::super::{Result, Error};
-use super::song::{SongInfo, Song, TripletFeel};
+use super::super::Result;
+use super::song::{Song, TripletFeel};
 use super::gp3_reader;
 
 
@@ -37,18 +37,23 @@ use super::gp3_reader;
 // -   Measures. See :meth:`readMeasures`.
 
 
-pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
-    let song_info = try!(gp3_reader::read_info(&mut io));
-    let triplet_feel = if try!(io.read_bool()) {
+pub fn read<T>(mut io: T) -> Result<Song>
+    where T: IoReader
+{
+    let song_info = gp3_reader::read_info(&mut io)?;
+    let triplet_feel = if io.read_bool()? {
         TripletFeel::Eighth
     } else {
         TripletFeel::None
     };
     let tempo = 0;
     let song = Song {
-        song_info: song_info, triplet_feel: Some(triplet_feel),
+        song_info: song_info,
+        triplet_feel: Some(triplet_feel),
         channels: vec![],
-        tempo: tempo, measure_headers: vec![], tracks: vec![]
+        tempo: tempo,
+        measure_headers: vec![],
+        tracks: vec![],
     };
     Ok(song)
 }

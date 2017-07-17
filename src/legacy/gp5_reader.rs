@@ -1,7 +1,6 @@
 use super::io_reader::IoReader;
-use super::super::{Result, Error};
+use super::super::Result;
 use super::song::{SongInfo, Song};
-use super::version::Version;
 
 //
 // A song consists of score information, triplet feel, lyrics, tempo, song
@@ -45,13 +44,18 @@ use super::version::Version;
 
 
 
-pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
-    let song_info = try!(read_info(&mut io));
+pub fn read<T>(mut io: T) -> Result<Song>
+    where T: IoReader
+{
+    let song_info = read_info(&mut io)?;
     let tempo = 0;
     let song = Song {
-        song_info: song_info, triplet_feel: None,
+        song_info: song_info,
+        triplet_feel: None,
         channels: vec![],
-        tempo: tempo, measure_headers: vec![], tracks: vec![]
+        tempo: tempo,
+        measure_headers: vec![],
+        tracks: vec![],
     };
     Ok(song)
 }
@@ -66,16 +70,18 @@ pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
 // -   copyright
 // -   tabbed by
 // -   instructions
-fn read_info<T>(io: &mut T) -> Result<SongInfo> where T: IoReader {
-    let title = try!(io.read_int_byte_sized_string());
-    let subtitle = try!(io.read_int_byte_sized_string());
-    let artist = try!(io.read_int_byte_sized_string());
-    let album = try!(io.read_int_byte_sized_string());
-    let words = try!(io.read_int_byte_sized_string());
-    let music = try!(io.read_int_byte_sized_string());
-    let copyright = try!(io.read_int_byte_sized_string());
-    let tab = try!(io.read_int_byte_sized_string());
-    let instructions = try!(io.read_int_byte_sized_string());
+fn read_info<T>(io: &mut T) -> Result<SongInfo>
+    where T: IoReader
+{
+    let title = io.read_int_byte_sized_string()?;
+    let subtitle = io.read_int_byte_sized_string()?;
+    let artist = io.read_int_byte_sized_string()?;
+    let album = io.read_int_byte_sized_string()?;
+    let words = io.read_int_byte_sized_string()?;
+    let music = io.read_int_byte_sized_string()?;
+    let copyright = io.read_int_byte_sized_string()?;
+    let tab = io.read_int_byte_sized_string()?;
+    let instructions = io.read_int_byte_sized_string()?;
     let song_info = SongInfo {
         title: title,
         subtitle: subtitle,
@@ -86,7 +92,7 @@ fn read_info<T>(io: &mut T) -> Result<SongInfo> where T: IoReader {
         copyright: copyright,
         tab: tab,
         instructions: instructions,
-        notice: vec![]
+        notice: vec![],
     };
     Ok(song_info)
 }

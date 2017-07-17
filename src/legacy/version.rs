@@ -5,5 +5,5 @@ pub enum Version {
     FichierGuitarProV406,
     FichierGuitarProL406,
     FichierGuitarProV500,
-    FichierGuitarProV510
+    FichierGuitarProV510,
 }

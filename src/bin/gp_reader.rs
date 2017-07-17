@@ -8,9 +8,9 @@ use guitar_tabs::legacy::GPFile;
 
 fn main() {
     env_logger::init().unwrap();
-    let args : Vec<_> = std::env::args().collect();
+    let args: Vec<_> = std::env::args().collect();
 
-    let io : Box<Read> = if args.len() > 1 {
+    let io: Box<Read> = if args.len() > 1 {
         Box::new(File::open(&Path::new(&args[1])).unwrap())
     } else {
         Box::new(std::io::stdin())

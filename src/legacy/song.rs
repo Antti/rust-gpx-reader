@@ -4,7 +4,7 @@ use std::default::Default;
 pub enum TripletFeel {
     None,
     Eighth,
-    Sixteenth
+    Sixteenth,
 }
 
 impl Default for TripletFeel {
@@ -24,12 +24,12 @@ pub struct SongInfo {
     pub copyright: String,
     pub tab: String,
     pub instructions: String,
-    pub notice: Vec<String>
+    pub notice: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub enum Duration {
-    QuarterTime
+    QuarterTime,
 }
 
 impl Default for Duration {
@@ -43,32 +43,36 @@ impl Default for Duration {
 pub struct TimeSignature {
     pub numerator: i8,
     pub denominator: i8, //TODO: Duration
-    pub beams: Vec<u8>
+    pub beams: Vec<u8>,
 }
 
 impl Default for TimeSignature {
     fn default() -> Self {
-        TimeSignature { numerator: 0, denominator: 0, beams: vec![0,0,0,0] }
+        TimeSignature {
+            numerator: 0,
+            denominator: 0,
+            beams: vec![0, 0, 0, 0],
+        }
     }
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct KeySignature {
     pub root: i8,
-    pub signature_type: i8
+    pub signature_type: i8,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Marker {
     pub title: String,
-    pub color: Color
+    pub color: Color,
 }
 
 #[derive(Debug, Default, Clone)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
-    pub b: u8
+    pub b: u8,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -89,7 +93,7 @@ pub struct MeasureHeader {
     pub has_double_bar: bool,
     pub marker: Option<Marker>,
     pub direction: Option<Direction>,
-    pub from_direction: Option<Direction>
+    pub from_direction: Option<Direction>,
 }
 
 #[derive(Debug)]
@@ -115,7 +119,7 @@ pub struct Channel {
     pub chorus: i8,
     pub reverb: i8,
     pub phaser: i8,
-    pub tremolo: i8
+    pub tremolo: i8,
 }
 
 const DEFAULT_PERCUSSION_CHANNEL: u8 = 9;

@@ -1,5 +1,5 @@
 use super::io_reader::IoReader;
-use super::super::{Result, Error};
+use super::super::Result;
 use super::song::{SongInfo, Song, Channel, MeasureHeader, TimeSignature, TripletFeel, Duration, KeySignature, Marker, Color};
 
 use std::default::Default;
@@ -32,26 +32,31 @@ use std::cmp::{max, min};
 //
 // -   Measures. See :meth:`readMeasures`.
 
-pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
-    let song_info = try!(read_info(&mut io));
-    let triplet_feel = if try!(io.read_bool()) {
+pub fn read<T>(mut io: T) -> Result<Song>
+    where T: IoReader
+{
+    let song_info = read_info(&mut io)?;
+    let triplet_feel = if io.read_bool()? {
         TripletFeel::Eighth
     } else {
         TripletFeel::None
     };
-    let tempo = try!(io.read_int());
-    let key = try!(io.read_int());
-    let channels = try!(read_midi_channels(&mut io));
-    let measure_count = try!(io.read_int());
-    let track_count = try!(io.read_int());
+    let tempo = io.read_int()?;
+    let key = io.read_int()?;
+    let channels = read_midi_channels(&mut io)?;
+    let measure_count = io.read_int()?;
+    let track_count = io.read_int()?;
 
-    let measure_headers = try!(read_measure_headers(&mut io, measure_count as u16));
+    let measure_headers = read_measure_headers(&mut io, measure_count as u16)?;
     // try!(read_tracks(&mut io, track_count, channels);
     // try!(read_measures(&mut io, song));
     let song = Song {
-        song_info: song_info, triplet_feel: Some(triplet_feel), tempo: tempo,
+        song_info: song_info,
+        triplet_feel: Some(triplet_feel),
+        tempo: tempo,
         channels: channels,
-        measure_headers: measure_headers, tracks: vec![]
+        measure_headers: measure_headers,
+        tracks: vec![],
     };
     Ok(song)
 }
@@ -65,19 +70,21 @@ pub fn read<T>(mut io: T) -> Result<Song> where T: IoReader {
 // -   copyright
 // -   tabbed by
 // -   instructions
-pub fn read_info<T>(io: &mut T) -> Result<SongInfo> where T: IoReader {
-    let title = try!(io.read_int_byte_sized_string());
-    let subtitle = try!(io.read_int_byte_sized_string());
-    let artist = try!(io.read_int_byte_sized_string());
-    let album = try!(io.read_int_byte_sized_string());
-    let words = try!(io.read_int_byte_sized_string());
-    let copyright = try!(io.read_int_byte_sized_string());
-    let tab = try!(io.read_int_byte_sized_string());
-    let instructions = try!(io.read_int_byte_sized_string());
-    let notes_count = try!(io.read_int());
+pub fn read_info<T>(io: &mut T) -> Result<SongInfo>
+    where T: IoReader
+{
+    let title = io.read_int_byte_sized_string()?;
+    let subtitle = io.read_int_byte_sized_string()?;
+    let artist = io.read_int_byte_sized_string()?;
+    let album = io.read_int_byte_sized_string()?;
+    let words = io.read_int_byte_sized_string()?;
+    let copyright = io.read_int_byte_sized_string()?;
+    let tab = io.read_int_byte_sized_string()?;
+    let instructions = io.read_int_byte_sized_string()?;
+    let notes_count = io.read_int()?;
     let mut notice = vec![];
     for _ in 0..notes_count {
-        notice.push(try!(io.read_int_byte_sized_string()));
+        notice.push(io.read_int_byte_sized_string()?);
     }
     let song_info = SongInfo {
         title: title,
@@ -89,7 +96,7 @@ pub fn read_info<T>(io: &mut T) -> Result<SongInfo> where T: IoReader {
         copyright: copyright,
         tab: tab,
         instructions: instructions,
-        notice: notice
+        notice: notice,
     };
     Ok(song_info)
 }
@@ -131,18 +138,20 @@ pub fn read_info<T>(io: &mut T) -> Result<SongInfo> where T: IoReader {
 //     -   blank2: :ref:`byte`.
 //
 
-fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>> where T: IoReader {
+fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>>
+    where T: IoReader
+{
     let mut channels = vec![];
     for i in 0..64 {
-        let instrument = try!(io.read_int());
+        let instrument = io.read_int()?;
         // if newChannel.isPercussionChannel and instrument == -1:
         //     instrument = 0
-        let volume = try!(io.read_signed_byte());
-        let balance = try!(io.read_signed_byte());
-        let chorus = try!(io.read_signed_byte());
-        let reverb = try!(io.read_signed_byte());
-        let phaser = try!(io.read_signed_byte());
-        let tremolo = try!(io.read_signed_byte());
+        let volume = io.read_signed_byte()?;
+        let balance = io.read_signed_byte()?;
+        let chorus = io.read_signed_byte()?;
+        let reverb = io.read_signed_byte()?;
+        let phaser = io.read_signed_byte()?;
+        let tremolo = io.read_signed_byte()?;
         let channel = Channel {
             channel: i,
             effect_channel: i,
@@ -152,11 +161,11 @@ fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>> where T: IoReader {
             chorus: chorus,
             reverb: reverb,
             phaser: phaser,
-            tremolo: tremolo
+            tremolo: tremolo,
         };
         channels.push(channel);
         // Backward compatibility with version 3.0
-        try!(io.skip(2));
+        io.skip(2)?;
     }
     Ok(channels)
 
@@ -200,42 +209,53 @@ fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>> where T: IoReader {
 //     key signature root, second is key signature type.
 
 
-fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<MeasureHeader>> where T: IoReader {
+fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<MeasureHeader>>
+    where T: IoReader
+{
     let mut measure_headers = vec![];
-    let mut previous : MeasureHeader = Default::default();
+    let mut previous: MeasureHeader = Default::default();
     for number in 1..measure_count + 1 {
-        let flags = try!(io.read_byte());
+        let flags = io.read_byte()?;
         let numerator = if flags & 0x01 > 0 {
-            try!(io.read_signed_byte())
+            io.read_signed_byte()?
         } else {
             previous.time_signature.numerator
         };
         let denominator = if flags & 0x02 > 0 {
-            try!(io.read_signed_byte())
+            io.read_signed_byte()?
         } else {
             previous.time_signature.denominator
         };
-        let time_signature = TimeSignature { numerator: numerator, denominator: denominator, ..Default::default()  };
+        let time_signature = TimeSignature {
+            numerator: numerator,
+            denominator: denominator,
+            ..Default::default()
+        };
         let is_repeat_open = flags & 0x04 > 0;
         let repeat_close = if flags & 0x08 > 0 {
-            try!(io.read_signed_byte()) > 0
-        } else { false }; // TODO: Figure out if we need to use Option
+            io.read_signed_byte()? > 0
+        } else {
+            false
+        }; // TODO: Figure out if we need to use Option
         let repeat_alternative = if flags & 0x10 > 0 {
-            try!(read_repeat_alternative(io, &measure_headers))
+            read_repeat_alternative(io, &measure_headers)?
         } else {
             0
         };
 
         let marker = if flags & 0x20 > 0 {
-            Some(try!(read_marker(io)))
+            Some(read_marker(io)?)
         } else {
             None
         };
 
         let key_signature = if flags & 0x40 > 0 {
-            let root = try!(io.read_signed_byte());
-            let signature_type = try!(io.read_signed_byte());
-            KeySignature { root: root, signature_type: signature_type }
+            let root = io.read_signed_byte()?;
+            let signature_type = io.read_signed_byte()?;
+            KeySignature {
+                root: root,
+                signature_type: signature_type,
+            }
         } else if number > 1 {
             previous.key_signature
         } else {
@@ -259,7 +279,7 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<Measure
             has_double_bar: has_double_bar,
             marker: marker,
             direction: None,
-            from_direction: None
+            from_direction: None,
         };
         previous = measure_header.clone();
         measure_headers.push(measure_header);
@@ -271,26 +291,35 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<Measure
 // equal to the marker's name length + 1, then a string containing the
 // marker's name. Finally the marker's color is written.
 
-fn read_marker<T>(io: &mut T) -> Result<Marker> where T: IoReader {
-    let title = try!(io.read_int_byte_sized_string());
-    let color = try!(read_color(io));
-    Ok(Marker { title: title, color: color })
+fn read_marker<T>(io: &mut T) -> Result<Marker>
+    where T: IoReader
+{
+    let title = io.read_int_byte_sized_string()?;
+    let color = read_color(io)?;
+    Ok(Marker {
+           title: title,
+           color: color,
+       })
 }
 
 // Colors are used by :class:`guitarpro.base.Marker` and
 // :class:`guitarpro.base.Track`. They consist of 3 consecutive bytes and
 // one blank byte.
 
-fn read_color<T>(io: &mut T) -> Result<Color> where T: IoReader {
-    let r = try!(io.read_byte());
-    let g = try!(io.read_byte());
-    let b = try!(io.read_byte());
-    try!(io.skip(1)); //alpha?
+fn read_color<T>(io: &mut T) -> Result<Color>
+    where T: IoReader
+{
+    let r = io.read_byte()?;
+    let g = io.read_byte()?;
+    let b = io.read_byte()?;
+    io.skip(1)?; //alpha?
     Ok(Color { r: r, g: g, b: b })
 }
 
-fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> Result<u8> where T: IoReader {
-    let value = try!(io.read_byte());
+fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> Result<u8>
+    where T: IoReader
+{
+    let value = io.read_byte()?;
     // let existing_alternatives = 0;
     Ok(value)
 }
