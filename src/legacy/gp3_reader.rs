@@ -270,8 +270,8 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<Measure
             start: Duration::QuarterTime,
             time_signature: time_signature,
             key_signature: key_signature,
-            tempo: 0, // song.tempo
-            triplet_feel: TripletFeel::None, //song.triplet_feel
+            tempo: 0, // Copy from song.tempo
+            triplet_feel: TripletFeel::None, // Copy from song.triplet_feel
             is_repeat_open: is_repeat_open,
             repeat_close: repeat_close,
             repeat_alternative: repeat_alternative,

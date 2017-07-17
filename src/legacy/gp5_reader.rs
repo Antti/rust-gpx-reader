@@ -73,6 +73,7 @@ pub fn read<T>(mut io: T) -> Result<Song>
 fn read_info<T>(io: &mut T) -> Result<SongInfo>
     where T: IoReader
 {
+    debug!("[GP5] Read info");
     let title = io.read_int_byte_sized_string()?;
     let subtitle = io.read_int_byte_sized_string()?;
     let artist = io.read_int_byte_sized_string()?;

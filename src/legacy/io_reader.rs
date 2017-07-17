@@ -81,7 +81,7 @@ pub trait IoReader: Read {
     // size is a number of bytes to read (always) and length, it's an optional string length,
     // which is used to truncate read string.
     fn read_string(&mut self, size: usize, length: Option<usize>) -> Result<String> {
-        debug!("Reading size:{size}, length:{length:?}",
+        debug!("Reading string size:{size}, length:{length:?}",
                size = size,
                length = length);
         if size > MAX_STRING_SIZE {
@@ -110,6 +110,7 @@ pub trait IoReader: Read {
             None => &buf as &[u8],
         };
         let s = convert_to_string(truncated_buf)?;
+        debug!("read string: {:?}", s);
         Ok(s)
     }
 }
