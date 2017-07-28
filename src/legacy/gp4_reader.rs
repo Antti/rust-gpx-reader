@@ -1,6 +1,6 @@
 use super::io_reader::IoReader;
 use super::super::Result;
-use super::song::{Song, TripletFeel};
+use super::song::{Song, TripletFeel, Lyrics, LyricsItem};
 use super::gp3_reader;
 
 
@@ -13,7 +13,7 @@ use super::gp3_reader;
 // -   Score information.
 //     See :meth:`readInfo`.
 //
-// -   Triplet feel: :ref:`bool`.
+// -   Triplet feel:    :ref:`bool`.
 //     If value is true, then triplet feel is set to eigth.
 //
 // -   Lyrics. See :meth:`readLyrics`.
@@ -36,17 +36,76 @@ use super::gp3_reader;
 //
 // -   Measures. See :meth:`readMeasures`.
 
+pub use self::gp3_reader::read_info;
+
+//       _______________________________________________________
+//      |        |                                               |
+//      |        | Version                                       |
+//      |        |_______________________________________________|
+//      |        |                                               |
+//      |        | Tablature                                     |
+//      |        |_______________________________________________|
+//      |Headers |                                               |
+//      |        | Lyrics                                        |
+//      |        |_______________________________________________|
+//      |        |                                               |
+//      |        | Other Tablature Information                   |
+//      |________|_______________________________________________|
+// File |        |                                               |
+//      |        | Measures                                      |
+//      |        |_______________________________________________|
+//      |        |                                               |
+//      |        | Tracks                                        |
+//      |        |_______________________________________________|
+//      |        |               |               |               |
+//      |        |               |               | Note 1        |
+//      |Body    |               | Beat 1        |_______________|
+//      |        |               |               |               |
+//      |        |               |               | Note i ...    |
+//      |        | Measure-Track |_______________|_______________|
+//      |        | Pairs         |               |               |
+//      |        |               |               | Note 1        |
+//      |        |               | Beat i ...    |_______________|
+//      |        |               |               |               |
+//      |        |               |               | Note i ...    |
+//      |________|_______________|_______________|_______________|
+//      |                                                        |
+//      | Chord Diagrams                                         |
+//      |________________________________________________________|
 
 pub fn read<T>(mut io: T) -> Result<Song>
     where T: IoReader
 {
-    let song_info = gp3_reader::read_info(&mut io)?;
+    // Headers
+    let song_info = read_info(&mut io)?;
+    // Triplet feel
     let triplet_feel = if io.read_bool()? {
         TripletFeel::Eighth
     } else {
         TripletFeel::None
     };
-    let tempo = 0;
+    // Lyrics
+    let lyrics_track = io.read_int()?;
+    let mut lyrics = Lyrics { track: lyrics_track as u32, lyrics: vec![] };
+    for _ in 0..5 {
+        let starting_measure = io.read_int()?;
+        let text = io.read_int_sized_string()?;
+        let lyrics_item = LyricsItem {
+            starting_measure: starting_measure as u32,
+            text
+        };
+        lyrics.lyrics.push(lyrics_item);
+    }
+    println!("{:?}", lyrics);
+    let tempo = io.read_int()?;
+    // song.key = gp.KeySignature((self.readInt(), 0))
+    // self.readSignedByte()  # octave
+    // channels = self.readMidiChannels()
+    // measureCount = self.readInt()
+    // trackCount = self.readInt()
+    // self.readMeasureHeaders(song, measureCount)
+    // self.readTracks(song, trackCount, channels)
+    // self.readMeasures(song)
     let song = Song {
         song_info: song_info,
         triplet_feel: Some(triplet_feel),

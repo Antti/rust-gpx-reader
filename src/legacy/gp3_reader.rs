@@ -1,6 +1,6 @@
 use super::io_reader::IoReader;
 use super::super::Result;
-use super::song::{SongInfo, Song, Channel, MeasureHeader, TimeSignature, TripletFeel, Duration, KeySignature, Marker, Color};
+use super::song::{SongInfo, Song, Channel, MeasureHeader, TimeSignature, TripletFeel, Duration, KeySignature, Marker, Color, Track, GuitarString};
 
 use std::default::Default;
 use std::cmp::{max, min};
@@ -43,20 +43,20 @@ pub fn read<T>(mut io: T) -> Result<Song>
     };
     let tempo = io.read_int()?;
     let key = io.read_int()?;
-    let channels = read_midi_channels(&mut io)?;
+    let mut channels = read_midi_channels(&mut io)?;
     let measure_count = io.read_int()?;
     let track_count = io.read_int()?;
 
-    let measure_headers = read_measure_headers(&mut io, measure_count as u16)?;
-    // try!(read_tracks(&mut io, track_count, channels);
-    // try!(read_measures(&mut io, song));
+    let measure_headers = read_measure_headers(&mut io, measure_count as u16, tempo as u16, triplet_feel)?;
+    let tracks = read_tracks(&mut io, track_count, &mut channels)?;
+    // let measures = read_measures(&mut io)?;
     let song = Song {
         song_info: song_info,
         triplet_feel: Some(triplet_feel),
         tempo: tempo,
         channels: channels,
         measure_headers: measure_headers,
-        tracks: vec![],
+        tracks: tracks,
     };
     Ok(song)
 }
@@ -81,9 +81,9 @@ pub fn read_info<T>(io: &mut T) -> Result<SongInfo>
     let copyright = io.read_int_byte_sized_string()?;
     let tab = io.read_int_byte_sized_string()?;
     let instructions = io.read_int_byte_sized_string()?;
-    let notes_count = io.read_int()?;
+    let notice_count = io.read_int()?;
     let mut notice = vec![];
-    for _ in 0..notes_count {
+    for _ in 0..notice_count {
         notice.push(io.read_int_byte_sized_string()?);
     }
     let song_info = SongInfo {
@@ -161,7 +161,7 @@ fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>>
             chorus: chorus,
             reverb: reverb,
             phaser: phaser,
-            tremolo: tremolo,
+            tremolo: tremolo
         };
         channels.push(channel);
         // Backward compatibility with version 3.0
@@ -209,7 +209,7 @@ fn read_midi_channels<T>(io: &mut T) -> Result<Vec<Channel>>
 //     key signature root, second is key signature type.
 
 
-fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<MeasureHeader>>
+fn read_measure_headers<T>(io: &mut T, measure_count: u16, song_tempo: u16, song_triplet_feel: TripletFeel) -> Result<Vec<MeasureHeader>>
     where T: IoReader
 {
     let mut measure_headers = vec![];
@@ -264,14 +264,13 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<Measure
 
         let has_double_bar = flags & 0x80 > 1;
 
-        // TODO: Finish
         let measure_header = MeasureHeader {
             number: number,
             start: Duration::QuarterTime,
             time_signature: time_signature,
             key_signature: key_signature,
-            tempo: 0, // Copy from song.tempo
-            triplet_feel: TripletFeel::None, // Copy from song.triplet_feel
+            tempo: song_tempo,
+            triplet_feel: song_triplet_feel,
             is_repeat_open: is_repeat_open,
             repeat_close: repeat_close,
             repeat_alternative: repeat_alternative,
@@ -285,6 +284,130 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16) -> Result<Vec<Measure
         measure_headers.push(measure_header);
     }
     Ok(measure_headers)
+}
+
+
+// Measures are written in the following order:
+// - measure 1/track 1
+// - measure 1/track 2
+// - ...
+// - measure 1/track m
+// - measure 2/track 1
+// - measure 2/track 2
+// - ...
+// - measure 2/track m
+// - ...
+// - measure n/track 1
+// - measure n/track 2
+// - ...
+// - measure n/track m
+// fn read_measures<T>(io: &mut T, track_count: i32, channels: &mut [Channel]) -> Result<Vec<Track>>
+//     where T: IoReader
+// {
+//     tempo = gp.Tempo(song.tempo)
+//             start = gp.Duration.quarterTime
+//             for header in song.measureHeaders:
+//                 header.start = start
+//                 for track in song.tracks:
+//                     measure = gp.Measure(track, header)
+//                     tempo = header.tempo
+//                     track.measures.append(measure)
+//                     self.readMeasure(measure)
+//                 header.tempo = tempo
+//                 start += header.length
+
+
+// }
+
+// The first byte is the track's flags. It presides the track's
+// attributes:
+// - *0x01*: drums track
+// - *0x02*: 12 stringed guitar track
+// - *0x04*: banjo track
+// - *0x08*: *blank*
+// - *0x10*: *blank*
+// - *0x20*: *blank*
+// - *0x40*: *blank*
+// - *0x80*: *blank*
+// Flags are followed by:
+// - Name: :ref:`byte-size-string`. A 40 characters long string
+//   containing the track's name.
+// - Number of strings: :ref:`int`. An integer equal to the number
+//     of strings of the track.
+// - Tuning of the strings: List of 7 :ref:`Ints <int>`. The tuning
+//   of the strings is stored as a 7-integers table, the "Number of
+//   strings" first integers being really used. The strings are
+//   stored from the highest to the lowest.
+// - Port: :ref:`int`. The number of the MIDI port used.
+// - Channel. See :meth:`GP3File.readChannel`.
+// - Number of frets: :ref:`int`. The number of frets of the
+//   instrument.
+// - Height of the capo: :ref:`int`. The number of the fret on
+//   which a capo is set. If no capo is used, the value is 0.
+// - Track's color. The track's displayed color in Guitar Pro.
+fn read_tracks<T>(io: &mut T, track_count: i32, channels: &mut [Channel]) -> Result<Vec<Track>>
+    where T: IoReader
+{
+    let mut tracks = vec![];
+    for number in 1..track_count + 1 {
+        let flags = io.read_byte()?;
+        let mut is_percussion_track = flags & 0x01 > 0;
+        let is12_stringed_guitar_track = flags & 0x02 > 0;
+        let is_banjo_track = flags & 0x04 > 0;
+        let name = io.read_byte_sized_string(40)?;
+        let string_count = io.read_int()?;
+        let mut strings = vec![];
+        for string_number in 1..8 {
+            let tuning = io.read_int()?;
+            if string_count >= string_number {
+                let string = GuitarString { string_number, tuning };
+                strings.push(string);
+            }
+        }
+        let port = io.read_int()?;
+        let channel_index = read_channel(io, channels)?;
+        if channels[channel_index].channel == 9 {
+            is_percussion_track = true; // Weird
+        }
+        let fret_count = io.read_int()?;
+        let offeset = io.read_int()?;
+        let color = read_color(io)?;
+        let track = Track {
+            number,
+            is_percussion_track,
+            is12_stringed_guitar_track,
+            is_banjo_track,
+            name,
+            strings,
+            port,
+            channel_index,
+            fret_count,
+            offeset,
+            color
+        };
+        tracks.push(track);
+    }
+    Ok(tracks)
+}
+
+// MIDI channel in Guitar Pro is represented by two integers. First
+// is zero-based number of channel, second is zero-based number of
+// channel used for effects.
+fn read_channel<T>(io: &mut T, channels: &mut [Channel]) -> Result<usize>
+    where T: IoReader
+{
+        let index = (io.read_int()? - 1) as usize;
+        let effect_channel = io.read_int()? - 1;
+        if 0 <= index && index < channels.len() {
+            let track_channel = &mut channels[index];
+            if track_channel.instrument < 0 {
+                track_channel.instrument = 0;
+            }
+            if !track_channel.is_percussion_channel() {
+                track_channel.effect_channel = effect_channel as u8;
+            }
+        }
+        Ok(index)
 }
 
 // The markers are written in two steps. First is written an integer
@@ -312,7 +435,7 @@ fn read_color<T>(io: &mut T) -> Result<Color>
     let r = io.read_byte()?;
     let g = io.read_byte()?;
     let b = io.read_byte()?;
-    io.skip(1)?; //alpha?
+    io.skip(1)?; //alpha? always 0x00
     Ok(Color { r: r, g: g, b: b })
 }
 
@@ -320,8 +443,14 @@ fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> 
     where T: IoReader
 {
     let value = io.read_byte()?;
-    // let existing_alternatives = 0;
-    Ok(value)
+    let mut existing_alternatives = 0;
+    for header in measure_headers.iter().rev() {
+        if header.is_repeat_open {
+            break;
+        }
+        existing_alternatives |= header.repeat_alternative;
+    }
+    Ok(1 << value - 1 ^ existing_alternatives)
 }
 
 fn to_channel_short(data: u8) -> i16 {

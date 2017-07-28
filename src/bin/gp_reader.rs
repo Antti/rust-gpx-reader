@@ -17,5 +17,5 @@ fn main() {
     };
     let gpf = GPFile::new(io);
     let info = gpf.read().unwrap();
-    println!("{:?}: {:?}", args.last(), info);
+    println!("{:#?}", info);
 }

@@ -1,6 +1,6 @@
 use std::default::Default;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum TripletFeel {
     None,
     Eighth,
@@ -97,7 +97,19 @@ pub struct MeasureHeader {
 }
 
 #[derive(Debug)]
-pub struct Track;
+pub struct Track {
+    pub number: i32,
+    pub is_percussion_track: bool,
+    pub is12_stringed_guitar_track: bool,
+    pub is_banjo_track: bool,
+    pub name: String,
+    pub strings: Vec<GuitarString>,
+    pub port: i32,
+    pub channel_index: usize,
+    pub fret_count: i32,
+    pub offeset: i32,
+    pub color: Color
+}
 
 #[derive(Debug)]
 pub struct Song {
@@ -110,6 +122,24 @@ pub struct Song {
 }
 
 #[derive(Debug)]
+pub struct GuitarString {
+    pub string_number: i32,
+    pub tuning: i32
+}
+
+#[derive(Debug)]
+pub struct Lyrics {
+    pub track: u32,
+    pub lyrics: Vec<LyricsItem>
+}
+
+#[derive(Debug)]
+pub struct LyricsItem {
+    pub starting_measure: u32,
+    pub text: String
+}
+
+#[derive(Debug)]
 pub struct Channel {
     pub channel: u8,
     pub effect_channel: u8,
@@ -119,13 +149,13 @@ pub struct Channel {
     pub chorus: i8,
     pub reverb: i8,
     pub phaser: i8,
-    pub tremolo: i8,
+    pub tremolo: i8
 }
 
 const DEFAULT_PERCUSSION_CHANNEL: u8 = 9;
 
 impl Channel {
-    fn is_percussion_channel(&self) -> bool {
+    pub fn is_percussion_channel(&self) -> bool {
         (self.channel % 16 == DEFAULT_PERCUSSION_CHANNEL)
     }
 }

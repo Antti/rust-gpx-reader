@@ -100,11 +100,8 @@ pub trait IoReader: Read {
                                    .into());
             }
         }
-        let mut buf: Vec<u8> = vec![0u8; need_to_read];
-        let read_count = self.read(&mut buf)?;
-        if read_count < need_to_read {
-            return Err(ErrorKind::FormatError(format!("Read {} bytes, expected {}", read_count, need_to_read)).into());
-        }
+        let mut buf = vec![0u8; need_to_read];
+        self.read_exact(&mut buf)?;
         let truncated_buf = match length {
             Some(len) => &buf[0..len],
             None => &buf as &[u8],
