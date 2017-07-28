@@ -87,20 +87,7 @@ pub trait IoReader: Read {
         if size > MAX_STRING_SIZE {
             return Err(ErrorKind::FormatError(format!("Requested to read {} bytes string, too much...", size)).into());
         }
-        let need_to_read = match length {
-            None => size,
-            Some(_) if size > 0 => size,
-            Some(length) => length,
-        };
-        if let Some(len) = length {
-            if len > need_to_read {
-                return Err(ErrorKind::FormatError(format!("Requested to return {} bytes, but will read only {} (len > size)",
-                                                          len,
-                                                          need_to_read))
-                                   .into());
-            }
-        }
-        let mut buf = vec![0u8; need_to_read];
+        let mut buf = vec![0u8; size];
         self.read_exact(&mut buf)?;
         let truncated_buf = match length {
             Some(len) => &buf[0..len],
