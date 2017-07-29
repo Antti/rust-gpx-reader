@@ -1,9 +1,8 @@
 use super::io_reader::IoReader;
 use super::super::Result;
-use super::song::{SongInfo, Song, Channel, MeasureHeader, TimeSignature, TripletFeel, Duration, KeySignature, Marker, Color, Track, GuitarString};
+use super::song::*;
 
 use std::default::Default;
-use std::cmp::{max, min};
 
 // A song consists of score information, triplet feel, tempo, song key,
 // MIDI channels, measure and track count, measure headers, tracks,
@@ -266,7 +265,7 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16, song_tempo: u16, song
 
         let measure_header = MeasureHeader {
             number: number,
-            start: Duration::QuarterTime,
+            start: DurationValue::QuarterTime as usize,
             time_signature: time_signature,
             key_signature: key_signature,
             tempo: song_tempo,
@@ -301,23 +300,24 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16, song_tempo: u16, song
 // - measure n/track 2
 // - ...
 // - measure n/track m
-// fn read_measures<T>(io: &mut T, track_count: i32, channels: &mut [Channel]) -> Result<Vec<Track>>
-//     where T: IoReader
-// {
-//     tempo = gp.Tempo(song.tempo)
-//             start = gp.Duration.quarterTime
-//             for header in song.measureHeaders:
-//                 header.start = start
-//                 for track in song.tracks:
-//                     measure = gp.Measure(track, header)
-//                     tempo = header.tempo
-//                     track.measures.append(measure)
-//                     self.readMeasure(measure)
-//                 header.tempo = tempo
-//                 start += header.length
-
-
-// }
+fn read_measures<T>(io: &mut T, tracks: &mut [Track], measureHeaders: &mut [MeasureHeader], tempo: u16) -> Result<Vec<Measure>>
+    where T: IoReader
+{
+    let start = DurationValue::QuarterTime as usize;
+    let mut measures = vec![];
+    for (header_index, header) in measureHeaders.iter_mut().enumerate() {
+        header.start = start;
+        for (track_index, track) in tracks.iter_mut().enumerate() {
+            let measure = Measure { track_index, header_index }; // ?
+            // tempo = header.tempo
+            // track.measures.append(measure)
+            // self.readMeasure(measure)
+        }
+        //         header.tempo = tempo
+        // start += header.length
+    }
+    Ok(measures)
+}
 
 // The first byte is the track's flags. It presides the track's
 // attributes:
@@ -398,7 +398,7 @@ fn read_channel<T>(io: &mut T, channels: &mut [Channel]) -> Result<usize>
 {
         let index = (io.read_int()? - 1) as usize;
         let effect_channel = io.read_int()? - 1;
-        if 0 <= index && index < channels.len() {
+        if index < channels.len() { //sanity check?
             let track_channel = &mut channels[index];
             if track_channel.instrument < 0 {
                 track_channel.instrument = 0;
@@ -406,6 +406,8 @@ fn read_channel<T>(io: &mut T, channels: &mut [Channel]) -> Result<usize>
             if !track_channel.is_percussion_channel() {
                 track_channel.effect_channel = effect_channel as u8;
             }
+        } else {
+            panic!("channel index is {}", index);
         }
         Ok(index)
 }
@@ -419,10 +421,7 @@ fn read_marker<T>(io: &mut T) -> Result<Marker>
 {
     let title = io.read_int_byte_sized_string()?;
     let color = read_color(io)?;
-    Ok(Marker {
-           title: title,
-           color: color,
-       })
+    Ok(Marker { title, color })
 }
 
 // Colors are used by :class:`guitarpro.base.Marker` and
@@ -436,7 +435,7 @@ fn read_color<T>(io: &mut T) -> Result<Color>
     let g = io.read_byte()?;
     let b = io.read_byte()?;
     io.skip(1)?; //alpha? always 0x00
-    Ok(Color { r: r, g: g, b: b })
+    Ok(Color { r, g, b })
 }
 
 fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> Result<u8>
@@ -453,7 +452,9 @@ fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> 
     Ok(1 << value - 1 ^ existing_alternatives)
 }
 
-fn to_channel_short(data: u8) -> i16 {
-    let value = max(-32768i16, min(32767i16, ((data as i16) << 3) - 1));
-    max(value, -1) + 1
-}
+// TODO: Do we need this?
+// fn to_channel_short(data: u8) -> i16 {
+//     use std::cmp::{max, min};
+//     let value = max(-32768i16, min(32767i16, ((data as i16) << 3) - 1));
+//     max(value, -1) + 1
+// }

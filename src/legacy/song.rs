@@ -2,9 +2,9 @@ use std::default::Default;
 
 #[derive(Debug, Clone, Copy)]
 pub enum TripletFeel {
-    None,
-    Eighth,
-    Sixteenth,
+    None = 0,
+    Eighth = 1,
+    Sixteenth = 2,
 }
 
 impl Default for TripletFeel {
@@ -27,17 +27,31 @@ pub struct SongInfo {
     pub notice: Vec<String>,
 }
 
-#[derive(Debug, Clone)]
-pub enum Duration {
-    QuarterTime,
+#[derive(Debug, Clone, Copy)]
+pub enum DurationValue {
+    QuarterTime = 960,
+    Whole = 1,
+    Half = 2,
+    Quarter = 4,
+    Eigth = 8,
+    Sixteenth = 16,
+    ThirtySecond = 32,
+    SixtyFourth = 64,
+    HundredTwentyEighth = 128
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Duration {
+    pub value: DurationValue,
+    pub is_dotted: bool,
+    pub is_double_dotted: bool,
 }
 
 impl Default for Duration {
     fn default() -> Self {
-        Duration::QuarterTime
+        Self { value: DurationValue::QuarterTime, is_dotted: false, is_double_dotted: false }
     }
 }
-
 
 #[derive(Debug, Clone)]
 pub struct TimeSignature {
@@ -81,7 +95,7 @@ pub struct Direction;
 #[derive(Debug, Default, Clone)]
 pub struct MeasureHeader {
     pub number: u16,
-    pub start: Duration,
+    pub start: usize,
     pub time_signature: TimeSignature,
     pub key_signature: KeySignature,
     pub tempo: u16,
@@ -94,6 +108,30 @@ pub struct MeasureHeader {
     pub marker: Option<Marker>,
     pub direction: Option<Direction>,
     pub from_direction: Option<Direction>,
+}
+
+pub struct Measure {
+    pub header_index: usize,
+    pub track_index: usize
+}
+
+pub enum MeasureClef {
+    Trebble = 0,
+    Bass = 1,
+    Tenor = 2,
+    Alto = 3
+}
+
+pub enum LineBreak {
+    None = 0,
+    Break = 1,
+    Protect = 2
+}
+
+pub enum VoiceDirection {
+    None = 0,
+    Up = 1,
+    Down = 2
 }
 
 #[derive(Debug)]
