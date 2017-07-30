@@ -221,7 +221,7 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16, song_tempo: u16, song
             previous.time_signature.numerator
         };
         let denominator = if flags & 0x02 > 0 {
-            io.read_signed_byte()?
+            Duration { value: io.read_signed_byte()?.into(), .. Default::default() }
         } else {
             previous.time_signature.denominator
         };
@@ -300,23 +300,223 @@ fn read_measure_headers<T>(io: &mut T, measure_count: u16, song_tempo: u16, song
 // - measure n/track 2
 // - ...
 // - measure n/track m
+// Measure track pairs
 fn read_measures<T>(io: &mut T, tracks: &mut [Track], measureHeaders: &mut [MeasureHeader], tempo: u16) -> Result<Vec<Measure>>
     where T: IoReader
 {
-    let start = DurationValue::QuarterTime as usize;
+    let mut start = DurationValue::QuarterTime as usize;
     let mut measures = vec![];
-    for (header_index, header) in measureHeaders.iter_mut().enumerate() {
+    for (measure_index, header) in measureHeaders.iter_mut().enumerate() {
         header.start = start;
         for (track_index, track) in tracks.iter_mut().enumerate() {
-            let measure = Measure { track_index, header_index }; // ?
+            let number_of_beats = io.read_int()?;
+            let measure = Measure { track_index, measure_index }; // ?
+            for b in 0..number_of_beats {
+                // reading beat
+                let beat =  read_beat(io);
+                start += 0;
+            }
+            track.measures.push(measure);
             // tempo = header.tempo
-            // track.measures.append(measure)
-            // self.readMeasure(measure)
         }
-        //         header.tempo = tempo
-        // start += header.length
+        // header.tempo = tempo
+        start += header.time_signature.len()
     }
     Ok(measures)
+}
+
+
+// The first byte is the beat flags. It lists the data present in
+// the current beat:
+// - *0x01*: dotted notes
+// - *0x02*: presence of a chord diagram
+// - *0x04*: presence of a text
+// - *0x08*: presence of effects
+// - *0x10*: presence of a mix table change event
+// - *0x20*: the beat is a n-tuplet
+// - *0x40*: status: True if the beat is empty of if it is a rest
+// - *0x80*: *blank*
+// Flags are followed by:
+// - Status: :ref:`byte`. If flag at *0x40* is true, read one byte.
+//     If value of the byte is *0x00* then beat is empty, if value is
+//     *0x02* then the beat is rest.
+// - Beat duration: :ref:`byte`. See :meth:`readDuration`.
+// - Chord diagram. See :meth:`readChord`.
+// - Text. See :meth:`readText`.
+// - Beat effects. See :meth:`readBeatEffects`.
+// - Mix table change effect. See :meth:`readMixTableChange`.
+pub fn read_beat<T>(io: &mut T) -> Result<Beat>
+    where T: IoReader
+{
+    let flags = io.read_byte()?;
+    let status = if flags & 0x40 > 0 {
+        io.read_byte()?.into()
+    } else {
+        BeatStatus::Normal
+    };
+    let duration = read_duration(io, flags)?;
+    if flags & 0x02 > 0 {
+        // read chord
+    }
+    if flags & 0x04 > 0 {
+        // read text
+    }
+    if flags & 0x08 > 0 {
+        // read beat effects
+    }
+    if flags & 0x10 > 0 {
+        // read mix table change
+    }
+
+    Ok(Beat {
+        notes: vec![],
+        duration: duration,
+        text: String::from(""),
+        start: 0,
+        effect: BeatEffect,
+        index: 0,
+        octave: Octave,
+        display: BeatDisplay,
+        status: BeatStatus::Empty
+    })
+
+    // read notes
+
+    // duration = self.readDuration(flags)
+    // effect = gp.NoteEffect()
+    // if flags & 0x02:
+    //     beat.effect.chord = self.readChord(len(voice.measure.track.strings))
+    // if flags & 0x04:
+    //     beat.text = self.readText()
+    // if flags & 0x08:
+    //     beat.effect = self.readBeatEffects(effect)
+    // if flags & 0x10:
+    //     mixTableChange = self.readMixTableChange(voice.measure)
+    //     beat.effect.mixTableChange = mixTableChange
+    // self.readNotes(voice.measure.track, beat, duration, effect)
+    // return duration.time if not beat.status == gp.BeatStatus.empty else 0
+}
+
+
+// Duration is composed of byte signifying duration and an integer
+// that maps to :class:`guitarpro.models.Tuplet`.
+// The byte maps to following values:
+// - *-2*: whole note
+// - *-1*: half note
+// -  *0*: quarter note
+// -  *1*: eighth note
+// -  *2*: sixteenth note
+// -  *3*: thirty-second note
+// If flag at *0x20* is true, the tuplet is read.
+
+pub fn read_duration<T>(io: &mut T, flags: u8) -> Result<Duration>
+    where T: IoReader
+{
+    let value = 1 << (io.read_signed_byte()? + 2);
+    let is_dotted = flags & 0x01 > 0;
+    let tuplet = if flags & 0x20 > 0 {
+        let tuplet_int = io.read_int()?;
+        match tuplet_int {
+            3 => Tuplet { enters: 3, times: 2 },
+            5 => Tuplet { enters: 5, times: 4 },
+            6 => Tuplet { enters: 6, times: 4 },
+            7 => Tuplet { enters: 7, times: 4 },
+            9 => Tuplet { enters: 9, times: 8 },
+            10 => Tuplet { enters: 10, times: 8 },
+            11 => Tuplet { enters: 11, times: 8 },
+            12 => Tuplet { enters: 12, times: 8 },
+            _ => panic!("Unexpeced tuplet number")
+        }
+    } else {
+        Default::default()
+    };
+    // TODO: Check how is_double_dotted read.
+    Ok(Duration { value: value.into(), is_dotted, tuplet, is_double_dotted: false })
+}
+
+// First byte is chord header. If it's set to 0, then following
+// chord is written in default (GP3) format. If chord header is set
+// to 1, then chord diagram in encoded in more advanced (GP4)
+// format.
+pub fn read_chord<T>(io: &mut T, strings_count: u8) -> Result<Chord>
+    where T: IoReader
+{
+    let new_format = io.read_bool()?;
+    if new_format {
+        let chord = read_new_chord(io)?;
+        Ok(Chord::NewChord(chord))
+    } else {
+        let mut chord = read_old_chord(io)?;
+        chord.frets.truncate(strings_count as usize);
+        Ok(Chord::OldChord(chord))
+    }
+}
+
+// Read new-style (GP4) chord diagram.
+// New-style chord diagram is read as follows:
+// - Sharp: :ref:`bool`. If true, display all semitones as sharps,
+//     otherwise display as flats.
+// - Blank space, 3 :ref:`Bytes <byte>`.
+// - Root: :ref:`int`. Values are:
+//     * -1 for customized chords
+//     *  0: C
+//     *  1: C#
+//     * ...
+// - Type: :ref:`int`. Determines the chord type as followed. See
+//     :class:`guitarpro.models.ChordType` for mapping.
+// - Chord extension: :ref:`int`. See
+//     :class:`guitarpro.models.ChordExtension` for mapping.
+// - Bass note: :ref:`int`. Lowest note of chord as in *C/Am*.
+// - Tonality: :ref:`int`. See
+//     :class:`guitarpro.models.ChordAlteration` for mapping.
+// - Add: :ref:`bool`. Determines if an "add" (added note) is
+//     present in the chord.
+// - Name: :ref:`byte-size-string`. Max length is 22.
+// - Fifth alteration: :ref:`int`. Maps to
+//     :class:`guitarpro.models.ChordAlteration`.
+// - Ninth alteration: :ref:`int`. Maps to
+//     :class:`guitarpro.models.ChordAlteration`.
+// - Eleventh alteration: :ref:`int`. Maps to
+//     :class:`guitarpro.models.ChordAlteration`.
+// - List of frets: 6 :ref:`Ints <int>`. Fret values are saved as
+//     in default format.
+// - Count of barres: :ref:`int`. Maximum count is 2.
+// - Barre frets: 2 :ref:`Ints <int>`.
+// - Barre start strings: 2 :ref:`Ints <int>`.
+// - Barre end string: 2 :ref:`Ints <int>`.
+// - Omissions: 7 :ref:`Bools <bool>`. If the value is true then
+//     note is played in chord.
+// - Blank space, 1 :ref:`byte`.
+
+pub fn read_new_chord<T>(io: &mut T) -> Result<NewChord>
+    where T: IoReader
+{
+//    Ok(NewChord { frets: vec![], first_fret: 0 })
+    loop {}
+}
+
+// Read chord diagram encoded in GP3 format.
+// Chord diagram is read as follows:
+// - Name: :ref:`int-byte-size-string`. Name of the chord, e.g.
+//     *Em*.
+// - First fret: :ref:`int`. The fret from which the chord is
+//     displayed in chord editor.
+// - List of frets: 6 :ref:`Ints <int>`. Frets are listed in order:
+//     fret on the string 1, fret on the string 2, ..., fret on the
+//     string 6. If string is untouched then the values of fret is
+//     *-1*.
+pub fn read_old_chord<T>(io: &mut T) -> Result<OldChord>
+    where T: IoReader
+{
+    let name = io.read_int_byte_sized_string()?;
+    let first_fret = io.read_int()?;
+    let mut frets = vec![];
+    if first_fret > 0 {
+        for i in 0..6 { // always read 6 ints
+            frets.push(io.read_int()?);
+        }
+    }
+    Ok(OldChord { frets, first_fret })
 }
 
 // The first byte is the track's flags. It presides the track's
@@ -383,7 +583,8 @@ fn read_tracks<T>(io: &mut T, track_count: i32, channels: &mut [Channel]) -> Res
             channel_index,
             fret_count,
             offeset,
-            color
+            color,
+            measures: vec![]
         };
         tracks.push(track);
     }

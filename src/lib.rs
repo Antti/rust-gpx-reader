@@ -6,6 +6,8 @@ extern crate log;
 extern crate env_logger;
 extern crate byteorder;
 extern crate encoding;
+#[macro_use]
+extern crate enum_primitive;
 
 #[cfg(feature = "autodetect_encoding")]
 extern crate uchardet;

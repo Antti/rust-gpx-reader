@@ -28,3 +28,4 @@ byteorder = "*"
 encoding = "0.2"
 uchardet = { version = "*", optional = true }
 error-chain = "*"
+enum_primitive = "*"
