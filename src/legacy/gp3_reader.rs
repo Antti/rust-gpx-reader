@@ -46,9 +46,10 @@ pub fn read<T>(mut io: T) -> Result<Song>
     let measure_count = io.read_int()?;
     let track_count = io.read_int()?;
 
-    let measure_headers = read_measure_headers(&mut io, measure_count as u16, tempo as u16, triplet_feel)?;
-    let tracks = read_tracks(&mut io, track_count, &mut channels)?;
-    // let measures = read_measures(&mut io)?;
+    let mut measure_headers = read_measure_headers(&mut io, measure_count as u16, tempo as u16, triplet_feel)?;
+    let mut tracks = read_tracks(&mut io, track_count, &mut channels)?;
+    let measures = read_measures(&mut io, &mut tracks, &mut measure_headers, tempo as u16)?;
+    println!("{:#?}", measures);
     let song = Song {
         song_info: song_info,
         triplet_feel: Some(triplet_feel),
@@ -313,7 +314,7 @@ fn read_measures<T>(io: &mut T, tracks: &mut [Track], measureHeaders: &mut [Meas
             let measure = Measure { track_index, measure_index }; // ?
             for b in 0..number_of_beats {
                 // reading beat
-                let beat =  read_beat(io);
+                let beat =  read_beat(io, track);
                 start += 0;
             }
             track.measures.push(measure);
@@ -345,7 +346,7 @@ fn read_measures<T>(io: &mut T, tracks: &mut [Track], measureHeaders: &mut [Meas
 // - Text. See :meth:`readText`.
 // - Beat effects. See :meth:`readBeatEffects`.
 // - Mix table change effect. See :meth:`readMixTableChange`.
-pub fn read_beat<T>(io: &mut T) -> Result<Beat>
+pub fn read_beat<T>(io: &mut T, track: &Track) -> Result<Beat>
     where T: IoReader
 {
     let flags = io.read_byte()?;
@@ -355,8 +356,10 @@ pub fn read_beat<T>(io: &mut T) -> Result<Beat>
         BeatStatus::Normal
     };
     let duration = read_duration(io, flags)?;
+    let beat_effect = Default::default();
     if flags & 0x02 > 0 {
         // read chord
+        let chord = read_chord(io, track.strings.len() as u8)?;
     }
     if flags & 0x04 > 0 {
         // read text
@@ -373,11 +376,11 @@ pub fn read_beat<T>(io: &mut T) -> Result<Beat>
         duration: duration,
         text: String::from(""),
         start: 0,
-        effect: BeatEffect,
+        effect: beat_effect,
         index: 0,
-        octave: Octave,
-        display: BeatDisplay,
-        status: BeatStatus::Empty
+        octave: Octave::None,
+        display: None,
+        status: status
     })
 
     // read notes
@@ -425,6 +428,7 @@ pub fn read_duration<T>(io: &mut T, flags: u8) -> Result<Duration>
             10 => Tuplet { enters: 10, times: 8 },
             11 => Tuplet { enters: 11, times: 8 },
             12 => Tuplet { enters: 12, times: 8 },
+            // 13 ?
             _ => panic!("Unexpeced tuplet number")
         }
     } else {
@@ -512,7 +516,7 @@ pub fn read_old_chord<T>(io: &mut T) -> Result<OldChord>
     let first_fret = io.read_int()?;
     let mut frets = vec![];
     if first_fret > 0 {
-        for i in 0..6 { // always read 6 ints
+        for _ in 0..6 { // always read 6 ints
             frets.push(io.read_int()?);
         }
     }
@@ -555,15 +559,14 @@ fn read_tracks<T>(io: &mut T, track_count: i32, channels: &mut [Channel]) -> Res
         let is12_stringed_guitar_track = flags & 0x02 > 0;
         let is_banjo_track = flags & 0x04 > 0;
         let name = io.read_byte_sized_string(40)?;
-        let string_count = io.read_int()?;
+        let strings_count = io.read_int()?;
         let mut strings = vec![];
         for string_number in 1..8 {
             let tuning = io.read_int()?;
-            if string_count >= string_number {
-                let string = GuitarString { string_number, tuning };
-                strings.push(string);
-            }
+            let string = GuitarString { string_number, tuning };
+            strings.push(string);
         }
+        strings.truncate(strings_count as usize);
         let port = io.read_int()?;
         let channel_index = read_channel(io, channels)?;
         if channels[channel_index].channel == 9 {
@@ -650,7 +653,7 @@ fn read_repeat_alternative<T>(io: &mut T, measure_headers: &[MeasureHeader]) -> 
         }
         existing_alternatives |= header.repeat_alternative;
     }
-    Ok(1 << value - 1 ^ existing_alternatives)
+    Ok(1 << (value - 1) ^ existing_alternatives)
 }
 
 // TODO: Do we need this?

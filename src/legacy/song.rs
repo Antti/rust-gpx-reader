@@ -44,9 +44,21 @@ pub enum DurationValue {
 }
 }
 
+impl From<u16> for DurationValue {
+    fn from(value: u16) -> DurationValue {
+        DurationValue::from_u16(value).expect("Unknown duration")
+    }
+}
+
 impl From<i8> for DurationValue {
     fn from(value: i8) -> DurationValue {
         DurationValue::from_i8(value).expect("Unknown duration")
+    }
+}
+
+impl From<i32> for DurationValue {
+    fn from(value: i32) -> DurationValue {
+        DurationValue::from_i32(value).expect("Unknown duration")
     }
 }
 
@@ -170,7 +182,7 @@ pub struct Beat {
     pub effect: BeatEffect,
     pub index: usize,
     pub octave: Octave,
-    pub display: BeatDisplay,
+    pub display: Option<BeatDisplay>, // Not GP3
     pub status: BeatStatus
 }
 
@@ -183,10 +195,65 @@ impl Beat {
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct BeatEffect {
+    pub stroke: BeatStroke,
+    pub has_rasgueado: bool,
+    pub pick_stroke: Option<BeatStrokeDirection>,
+    pub chord: Option<Chord>,
+    pub fade_in: bool,
+    pub tremolo_bar: Option<BendEffect>,
+    pub mix_table_change: Option<MixTableChange>,
+    pub slap_effect: Option<SlapEffect>,
+    pub vibrato: Option<Vibrato>
+}
+
 #[derive(Debug, Clone)]
-pub struct BeatEffect;
+pub struct BeatDisplay {
+    pub break_beam: bool,
+    pub force_beam: bool,
+    pub beam_direction: VoiceDirection,
+    pub tuplet_bracket: TupletBracket,
+    pub break_secondary: u8,
+    pub break_secondary_tuplet: bool,
+    pub force_bracket: bool
+}
+
 #[derive(Debug, Clone)]
-pub struct BeatDisplay;
+pub enum TupletBracket {
+    None = 0,
+    Start = 1,
+    End = 2
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct BeatStroke {
+    pub direction: Option<BeatStrokeDirection>,
+    pub value: u8
+}
+
+#[derive(Debug, Clone)]
+pub enum BeatStrokeDirection {
+    Up,
+    Down
+}
+
+#[derive(Debug, Clone)]
+pub struct TremoloBar;
+
+#[derive(Debug, Clone)]
+pub struct MixTableChange;
+
+#[derive(Debug, Clone)]
+pub enum SlapEffect {
+    None = 0,
+    Tapping = 1,
+    Slapping = 2,
+    Popping = 3
+}
+
+#[derive(Debug, Clone)]
+pub struct Vibrato;
 
 enum_from_primitive! {
 #[derive(Debug, Clone)]
@@ -194,6 +261,52 @@ pub enum BeatStatus {
     Empty = 0,
     Normal = 1,
     Rest = 2
+}
+}
+
+#[derive(Debug, Clone)]
+pub struct BendEffect {
+    pub effect_type: BendType,
+    pub value: u8,
+    pub points: Vec<BendPoint>
+}
+
+#[derive(Debug, Clone)]
+pub struct BendPoint {
+    pub position: u8,
+    pub value: u8,
+    pub vibrato: bool
+}
+
+enum_from_primitive! {
+#[derive(Debug, Clone)]
+pub enum BendType {
+    // No Preset.
+    none = 0,
+    // A simple bend.
+    bend = 1,
+    // A bend and release afterwards.
+    bend_release = 2,
+    // A bend, then release and rebend.
+    bend_release_bend = 3,
+    // Prebend.
+    prebend = 4,
+    // Prebend and then release.
+    prebend_release = 5,
+    // Tremolo Bar
+    //
+    // Dip the bar down and then back up.
+    dip = 6,
+    // Dive the bar.
+    dive = 7,
+    // Release the bar up.
+    release_up = 8,
+    // Dip the bar up and then back down.
+    inverted_dip = 9,
+    // Return the bar.
+    return_ = 10,
+    // Release the bar down.
+    release_down = 11
 }
 }
 
@@ -209,10 +322,131 @@ pub struct Voice {
 }
 
 #[derive(Debug, Clone)]
-pub struct Note;
+pub struct Note {
+    pub beat: Beat,
+    pub value: u8,
+    pub velocity: Velocity,
+    pub string: u8,
+    pub effect: NoteEffect,
+    pub duration_percent: f32,
+    pub swap_accidentals: bool,
+    pub note_type: NoteType
+}
 
 #[derive(Debug, Clone)]
-pub struct Octave;
+pub struct NoteEffect {
+    pub accentuated_note: bool,
+    pub bend: Option<BendEffect>,
+    pub ghost_note: bool,
+    pub grace: Option<GraceEffect>,
+    pub hammer: bool,
+    pub harmonic: Option<HarmonicEffect>,
+    pub heavy_accentuated_note: bool,
+    pub left_hand_finger: Fingering,
+    pub let_ring: bool,
+    pub palm_mute: bool,
+    pub right_hand_finger: Fingering,
+    pub slides: Vec<SlideType>,
+    pub staccato: bool,
+    pub tremolo_picking: Option<TremoloPickingEffect>,
+    pub trill: Option<TrillEffect>,
+    pub vibrato: bool
+}
+
+enum_from_primitive! {
+#[derive(Debug, Clone)]
+pub enum NoteType {
+    Rest = 0,
+    Normal = 1,
+    Tie = 2,
+    Dead = 3
+}
+}
+
+#[derive(Debug, Clone)]
+pub struct GraceEffect {
+    pub duration: u8,
+    pub fret: u8,
+    pub is_dead: bool,
+    pub is_on_beat: bool,
+    pub transition: GraceEffectTransition,
+    pub velocity: Velocity
+}
+
+#[derive(Debug, Clone)]
+pub enum HarmonicEffect {
+    NaturalHarmonic,
+    ArtificialHarmonic(u8, Octave),
+    TappedHarmonic(u8),
+    PinchHarmonic,
+    SemiHarmonic
+}
+
+#[derive(Debug, Clone)]
+pub struct TremoloPickingEffect {
+    pub duration: Duration
+}
+
+#[derive(Debug, Clone)]
+pub struct TrillEffect {
+    pub fret: u8,
+    pub duration: Duration
+}
+
+#[derive(Debug, Clone)]
+pub enum Velocity {
+    Default
+}
+
+enum_from_primitive! {
+#[derive(Debug, Clone)]
+pub enum Fingering {
+    Unknown = -2,
+    Open = -1,
+    Thumb = 0,
+    Index = 1,
+    Middle = 2,
+    Annular = 3,
+    Little = 4
+}
+}
+
+enum_from_primitive! {
+#[derive(Debug, Clone)]
+pub enum SlideType {
+    into_from_above = -2,
+    into_from_below = -1,
+    none = 0,
+    shift_slide_to = 1,
+    legato_slide_to = 2,
+    out_downwards = 3,
+    out_upwards = 4
+}
+}
+
+enum_from_primitive! {
+#[derive(Debug, Clone)]
+pub enum GraceEffectTransition {
+    None = 0,
+    // Slide from the grace note to the real one.
+    Slide = 1,
+    // Perform a bend from the grace note to the real one.
+    Bend = 2,
+    // Perform a hammer on.
+    Hammer = 3
+}
+}
+
+
+
+#[derive(Debug, Clone)]
+pub enum Octave {
+    None = 0,
+    Ottava = 1,
+    Quindicesima = 2,
+    OttavaBassa = 3,
+    QuindicesimaBassa = 4
+}
 
 #[derive(Debug, Clone)]
 pub struct OldChord {
@@ -242,6 +476,7 @@ pub struct NewChord {
     pub show: bool,
 }
 
+#[derive(Debug, Clone)]
 pub enum Chord {
     NewChord(NewChord),
     OldChord(OldChord)
